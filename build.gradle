@@ -1,0 +1,75 @@
+plugins {
+    id 'com.github.maiflai.scalatest' version '0.16'
+}
+
+allprojects {
+    apply plugin: 'scala'
+    apply plugin: 'idea'
+    apply plugin: 'com.github.maiflai.scalatest'
+
+    sourceCompatibility = '1.8'
+    group = 'com.github.andreas-schroeder'
+    version = '0.0.0'
+
+    sourceSets {
+        main {
+            scala {
+                srcDirs = ['src/main/scala', 'src/main/java']
+            }
+            java {
+                srcDirs = []
+            }
+        }
+    }
+
+    repositories {
+        mavenCentral()
+        maven {
+            url "https://oss.sonatype.org/content/repositories/snapshots"
+        }
+    }
+
+    dependencies {
+
+        compile       group: 'org.scala-lang',             name: 'scala-library', version: '2.12.3'
+        compile       group: 'org.apache.kafka',           name: 'kafka-streams', version: '0.11.0.0'
+        compile       group: 'biz.paluch.redis',           name: 'lettuce',       version: '4.4.0.Final'
+        compile scala(group: 'io.reactivex',               name: 'rxscala',       version: '0.26.5')
+        compile scala(group: 'com.typesafe.scala-logging', name: 'scala-logging', version: '3.7.2')
+
+        testCompile       group: 'com.github.kstyrc',    name: 'embedded-redis',           version: '0.6'
+        testCompile       group: 'org.mockito',          name: 'mockito-core',             version: '2.8.47'
+        testCompile       group: 'org.apache.kafka',     name: 'kafka-streams',            version: '0.11.0.0'
+        testCompile       group: 'org.apache.zookeeper', name: 'zookeeper',                version: '3.4.10', ext: 'pom'
+        testCompile       group: 'org.slf4j',            name: 'slf4j-log4j12',            version: '1.7.25'
+        testCompile scala(group: 'net.manub',            name: 'scalatest-embedded-kafka', version: '0.15.1')
+        testCompile scala(group: 'org.scalatest',        name: 'scalatest',                version: '3.0.1')
+
+        testRuntime group: 'org.pegdown',    name: 'pegdown',         version: '1.4.2'
+    }
+
+    task wrapper(type: Wrapper) {
+        gradleVersion = '4.1'
+    }
+
+    test {
+        testLogging {
+            events "passed", "skipped", "failed"
+        }
+    }
+}
+
+jar {
+    manifest {
+        attributes("Implementation-Title": "Redisks",
+                   "Implementation-Version": version)
+    }
+}
+
+project(':it') {
+    dependencies {
+        testCompile rootProject
+    }
+}
+
+def scala(Object dep) { "${dep.group}:${dep.name}_2.12:${dep.version}" }
