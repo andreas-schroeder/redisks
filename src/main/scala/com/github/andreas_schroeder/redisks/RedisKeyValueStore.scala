@@ -15,8 +15,8 @@ import org.apache.kafka.streams.processor.{ProcessorContext, StateStore}
 import org.apache.kafka.streams.state.{KeyValueIterator, KeyValueStore}
 import rx.lang.scala.JavaConversions.toScalaObservable
 import rx.lang.scala.Observable
-import rx.lang.scala.schedulers.IOScheduler
-import rx.lang.scala.subjects.ReplaySubject
+import rx.lang.scala.schedulers.ComputationScheduler
+import rx.lang.scala.subjects.PublishSubject
 import rx.{Observable => JavaObservable}
 
 import scala.concurrent.duration._
@@ -207,6 +207,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
   private def all(predicate: K => Boolean): KeyValueIterator[K, V] = {
     val batchSize: Int = 50
     val partition = context.taskId().partition
+    val it: RedisKeyValueIterator[K, V] = new RedisKeyValueIterator[K, V](batchSize)
 
     val partitionKeystoreKey = keystoreKeyWithPartition(partition).clone()
 
@@ -224,19 +225,18 @@ class RedisKeyValueStore[K,V <: AnyRef](
       (prefixedKeys, keys)
     }
 
-    val it: RedisKeyValueIterator[K, V] = new RedisKeyValueIterator[K, V](batchSize)
+    val backoffOrCancel: Observable[Throwable] => Observable[Any] = backoffOrCancelWhen(it.closed)
 
-    implicit val cancel: () => Boolean = () => it.closed
-
-    val cursorSubject = ReplaySubject[Option[ValueScanCursor[RawBytes]]]()
+    val cursorSubject = PublishSubject[Option[ValueScanCursor[RawBytes]]]()
     val scanArgs: ScanArgs = ScanArgs.Builder.limit(batchSize)
 
-    def nextKeyBatch(maybeCursor: Option[ValueScanCursor[RawBytes]]) = maybeCursor match {
-      case None => cmd(_.sscan(partitionKeystoreKey, scanArgs))
-      case Some(lastCursor) => cmd(_.sscan(partitionKeystoreKey, lastCursor, scanArgs))
-    }
+    def nextKeyBatch(maybeCursor: Option[ValueScanCursor[RawBytes]]): Observable[ValueScanCursor[RawBytes]] =
+      maybeCursor match {
+        case None => cmd(_.sscan(partitionKeystoreKey, scanArgs))
+        case Some(lastCursor) => cmd(_.sscan(partitionKeystoreKey, lastCursor, scanArgs))
+      }
 
-    def collectValues(cursor: ValueScanCursor[RawBytes]): Observable[KeyValue[K, V]] = {
+    def collectKeyValues(cursor: ValueScanCursor[RawBytes]): Observable[KeyValue[K, V]] = {
       val rawKeys = cursor.getValues.asScala
       val (prefixedKeys, keys) = collectKeys(rawKeys)
       if (keys.isEmpty) {
@@ -245,28 +245,29 @@ class RedisKeyValueStore[K,V <: AnyRef](
       } else {
         cmd(_.mget(prefixedKeys: _*))
           .retryWhen(backoffOrCancel)
-          .zipWith(keys)((v, k) => new KeyValue(k, value(v)))
+          .zipWith(keys)((rawValue, key) => new KeyValue(key, value(rawValue)))
           .filter(_ => !it.closed)
           .doOnCompleted(cursorSubject.onNext(Some(cursor)))
       }
     }
 
+    val scheduler = ComputationScheduler()
     cursorSubject
-      .subscribeOn(IOScheduler())
+      .observeOn(scheduler)
       .flatMap {
         case Some(cursor) if cursor.isFinished || it.closed =>
           cursorSubject.onCompleted()
           Observable.empty
         case maybeLastCursor =>
           nextKeyBatch(maybeLastCursor)
+            .observeOn(scheduler)
             .retryWhen(backoffOrCancel)
-            .flatMap(collectValues)
+            .flatMap(collectKeyValues)
       }
       .materialize
       .foreach(it.queue.put)
 
     cursorSubject.onNext(None)
-
     it
   }
 
@@ -294,13 +295,13 @@ object RedisKeyValueStore extends StrictLogging {
     tryNumber
   }
 
-  private def backoff(attempts: Observable[Throwable]): Observable[Any] = backoffOrCancel(attempts)(() => false)
+  private def backoff(attempts: Observable[Throwable]): Observable[Any] = backoffOrCancelWhen(false)(attempts)
 
-  private def backoffOrCancel(attempts: Observable[Throwable])(implicit cancel: () => Boolean): Observable[Any] = {
+  private def backoffOrCancelWhen(cancel: => Boolean)(attempts: Observable[Throwable]): Observable[Any] = {
     val maxBackoffSeconds = 60
     attempts
       .zipWith(Observable.from(1 to 1000)) { (ex: Throwable, i: Int) => logFailureRetry(ex, i) }
-      .filter(_ => !cancel())
+      .filter(_ => !cancel)
       .flatMap((i: Int) => Observable.timer(Math.min(i * i, maxBackoffSeconds).seconds))
   }
 }
