@@ -37,16 +37,16 @@ class RedisKeyValueStore[K,V <: AnyRef](
                              ) extends KeyValueStore[K,V] with StrictLogging {
   import RedisKeyValueStore._
 
-  type RawBytes = Array[Byte]
+  type Bytes = Array[Byte]
 
-  private val keyStoreKeyTemplate: RawBytes = new Array[Byte](keyStoreKeyIn.length + 4)
+  private val keyStoreKeyTemplate: Bytes = new Array[Byte](keyStoreKeyIn.length + 4)
   System.arraycopy(keyStoreKeyIn, 0, keyStoreKeyTemplate, 0, keyStoreKeyIn.length)
 
   private val keyOrdering: Ordering[K] = Ordering.comparatorToOrdering(keyComparator)
 
   private var open = false
   private var context: ProcessorContext = _
-  private var redis: RedisReactiveCommands[RawBytes, RawBytes] = _
+  private var redis: RedisReactiveCommands[Bytes, Bytes] = _
 
   private var codec: RedisToKafkaCodec[K, V] = _
   private var putIfAbsentScript: String = _
@@ -59,8 +59,8 @@ class RedisKeyValueStore[K,V <: AnyRef](
     val codec: RedisToKafkaCodec[K, V] = RedisToKafkaCodec.fromSerdes(if (keySerde == null) context.keySerde.asInstanceOf[Serde[K]]
     else keySerde, if (valueSerde == null) context.valueSerde.asInstanceOf[Serde[V]]
     else valueSerde, name)
-    val connection: StatefulRedisConnection[RawBytes, RawBytes] = redisClient.connect(ByteArrayCodec.INSTANCE)
-    val reactive: RedisReactiveCommands[RawBytes, RawBytes] = connection.reactive
+    val connection: StatefulRedisConnection[Bytes, Bytes] = redisClient.connect(ByteArrayCodec.INSTANCE)
+    val reactive: RedisReactiveCommands[Bytes, Bytes] = connection.reactive
     if (root != null) context.register(root, false, (_, _) => ())
 
     this.synchronized {
@@ -84,9 +84,9 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
   private def scriptLoad(content: String): String = cmd(_.scriptLoad(content.getBytes)).toBlocking.first
 
-  private def keystoreKey: RawBytes = keystoreKeyWithPartition(context.partition())
+  private def keystoreKey: Bytes = keystoreKeyWithPartition(context.partition())
 
-  private def keystoreKeyWithPartition(partition: Int): RawBytes = {
+  private def keystoreKeyWithPartition(partition: Int): Bytes = {
     KeyUtils.addPartition(partition, keyStoreKeyTemplate, keyStoreKeyTemplate.length - 4)
     keyStoreKeyTemplate
   }
@@ -104,11 +104,11 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
   override def isOpen: Boolean = open
 
-  private def prefixedRawKey(key: K): RawBytes = codec.encodeKey(key, context.partition, keyPrefix)._2
+  private def prefixedRawKey(key: K): Bytes = codec.encodeKey(key, context.partition, keyPrefix)._2
 
-  private def prefixedRawKeys(key: K): (RawBytes, RawBytes) = codec.encodeKey(key, context.partition, keyPrefix)
+  private def prefixedRawKeys(key: K): (Bytes, Bytes) = codec.encodeKey(key, context.partition, keyPrefix)
 
-  private def rawValue(value: V): RawBytes = {
+  private def rawValue(value: V): Bytes = {
     if (value == null) {
       Array.empty[Byte]
     } else {
@@ -116,7 +116,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
     }
   }
 
-  private def value(rawValue: RawBytes): V = {
+  private def value(rawValue: Bytes): V = {
     if (rawValue == null) {
       nullValue
     } else {
@@ -124,9 +124,9 @@ class RedisKeyValueStore[K,V <: AnyRef](
     }
   }
 
-  private def key(rawKey: RawBytes): K = codec.decodeKey(rawKey)
+  private def key(rawKey: Bytes): K = codec.decodeKey(rawKey)
 
-  private def cmd[T](f: RedisReactiveCommands[RawBytes, RawBytes] => JavaObservable[T]): Observable[T] =
+  private def cmd[T](f: RedisReactiveCommands[Bytes, Bytes] => JavaObservable[T]): Observable[T] =
     toScalaObservable(f(redis))
 
   override def put(key: K, value: V): Unit = {
@@ -148,7 +148,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
     Objects.requireNonNull(key, "key cannot be null")
     Objects.requireNonNull(value, "value cannot be null")
     val (vanillaKey, prefixedRawKey) = prefixedRawKeys(key)
-    cmd(_.evalsha[RawBytes](
+    cmd(_.evalsha[Bytes](
         putIfAbsentScript,
         ScriptOutputType.VALUE,
         Array(prefixedRawKey, keystoreKey),
@@ -161,8 +161,8 @@ class RedisKeyValueStore[K,V <: AnyRef](
   }
 
   override def putAll(entries: util.List[KeyValue[K, V]]): Unit = {
-    val map: util.Map[RawBytes, RawBytes] = new util.HashMap(entries.size)
-    val keys = new ListBuffer[RawBytes]
+    val map: util.Map[Bytes, Bytes] = new util.HashMap(entries.size)
+    val keys = new ListBuffer[Bytes]
     for (entry <- entries.asScala) {
       val (vanillaKey, prefixedRawKey) = prefixedRawKeys(entry.key)
       map.put(prefixedRawKey, rawValue(entry.value))
@@ -177,7 +177,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
   override def delete(key: K): V = {
     Objects.requireNonNull(key, "key cannot be null")
     val (vanillaKey, prefixedRawKey) = prefixedRawKeys(key)
-    cmd(_.evalsha[RawBytes](
+    cmd(_.evalsha[Bytes](
         deleteScript,
         ScriptOutputType.VALUE,
         Array(prefixedRawKey, keystoreKey),
@@ -211,8 +211,8 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
     val partitionKeystoreKey = keystoreKeyWithPartition(partition).clone()
 
-    def collectKeys(rawKeys: Seq[RawBytes]) = {
-      val prefixedKeys: mutable.Buffer[RawBytes] = new mutable.ArrayBuffer(rawKeys.length)
+    def collectKeys(rawKeys: Seq[Bytes]) = {
+      val prefixedKeys: mutable.Buffer[Bytes] = new mutable.ArrayBuffer(rawKeys.length)
       val keys: mutable.Buffer[K] = new mutable.ArrayBuffer(rawKeys.length)
       for {
         rawKey <- rawKeys
@@ -227,16 +227,16 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
     val backoffOrCancel: Observable[Throwable] => Observable[Any] = backoffOrCancelWhen(it.closed)
 
-    val cursorSubject = PublishSubject[Option[ValueScanCursor[RawBytes]]]()
+    val cursorSubject = PublishSubject[Option[ValueScanCursor[Bytes]]]()
     val scanArgs: ScanArgs = ScanArgs.Builder.limit(batchSize)
 
-    def nextKeyBatch(maybeCursor: Option[ValueScanCursor[RawBytes]]): Observable[ValueScanCursor[RawBytes]] =
+    def nextKeyBatch(maybeCursor: Option[ValueScanCursor[Bytes]]): Observable[ValueScanCursor[Bytes]] =
       maybeCursor match {
         case None => cmd(_.sscan(partitionKeystoreKey, scanArgs))
         case Some(lastCursor) => cmd(_.sscan(partitionKeystoreKey, lastCursor, scanArgs))
       }
 
-    def collectKeyValues(cursor: ValueScanCursor[RawBytes]): Observable[KeyValue[K, V]] = {
+    def collectKeyValues(cursor: ValueScanCursor[Bytes]): Observable[KeyValue[K, V]] = {
       val rawKeys = cursor.getValues.asScala
       val (prefixedKeys, keys) = collectKeys(rawKeys)
       if (keys.isEmpty) {
