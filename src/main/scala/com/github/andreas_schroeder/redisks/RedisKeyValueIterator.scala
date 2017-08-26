@@ -40,9 +40,6 @@ class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] 
         case None =>
           throw new NoSuchElementException()
       }
-
-      peeked = true
-      last.key
     }
   }
 
