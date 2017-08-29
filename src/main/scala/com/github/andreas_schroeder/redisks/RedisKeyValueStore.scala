@@ -44,6 +44,15 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
   private val keyOrdering: Ordering[K] = Ordering.comparatorToOrdering(keyComparator)
 
+  private val cancelableBackoff = new CancelableBackoff(
+    1.second,
+    60.seconds,
+    100000,
+    ComputationScheduler(),
+    logBackoff,
+    logBackoffFailure
+   )
+
   private var open = false
   private var context: ProcessorContext = _
   private var redis: RedisReactiveCommands[Bytes, Bytes] = _
@@ -128,6 +137,18 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
   private def cmd[T](f: RedisReactiveCommands[Bytes, Bytes] => JavaObservable[T]): Observable[T] =
     toScalaObservable(f(redis))
+
+  private def logBackoff(ex: Throwable, tryNumber: Int): Unit =
+    logger.warn("Attempt {} failed with {}: {}", tryNumber, ex.getClass.getSimpleName, ex.getMessage)
+
+  def logBackoffFailure(ex: Throwable): Unit =
+    logger.warn("Retry with backoff failed, finally giving up. {}: {}", ex.getClass.getSimpleName, ex.getMessage)
+
+  def backoff(attempts: Observable[Throwable]): Observable[Any] = cancelableBackoff.backoff(attempts)
+
+  def backoffOrCancelWhen(cancel: => Boolean)(attempts: Observable[Throwable]): Observable[Any] =
+    cancelableBackoff.backoffOrCancelWhen(cancel, attempts)
+
 
   override def put(key: K, value: V): Unit = {
     Objects.requireNonNull(key, "key cannot be null")
@@ -290,18 +311,4 @@ object RedisKeyValueStore extends StrictLogging {
   private val PUT_SCRIPT = loadScript("put.lua")
   private val DELETE_SCRIPT = loadScript("delete.lua")
 
-  private def logFailureRetry(ex: Throwable, tryNumber: Int): Int = {
-    logger.warn("Attempt {} failed with {}: {}", tryNumber, ex.getClass.getSimpleName, ex.getMessage)
-    tryNumber
-  }
-
-  private def backoff(attempts: Observable[Throwable]): Observable[Any] = backoffOrCancelWhen(false)(attempts)
-
-  private def backoffOrCancelWhen(cancel: => Boolean)(attempts: Observable[Throwable]): Observable[Any] = {
-    val maxBackoffSeconds = 60
-    attempts
-      .zipWith(Observable.from(1 to 1000)) { (ex: Throwable, i: Int) => logFailureRetry(ex, i) }
-      .filter(_ => !cancel)
-      .flatMap((i: Int) => Observable.timer(Math.min(i * i, maxBackoffSeconds).seconds))
-  }
 }
