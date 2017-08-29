@@ -15,7 +15,11 @@ import redis.embedded.RedisServer
 
 import scala.collection.JavaConverters._
 
-class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec with GivenWhenThen with MockitoSugar with MustMatchers {
+class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
+  with RedisKeyValueStores
+  with GivenWhenThen
+  with MockitoSugar
+  with MustMatchers {
 
   case class FixtureParam(redisServer: RedisServer,
                           client: RedisClient,
@@ -297,36 +301,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec with GivenWhe
     }
   }
 
-  private def freePort = {
-    val socket = new ServerSocket(0)
-    val port = socket.getLocalPort
-    socket.close()
-    port
-  }
-
-  private def createContext = {
-    val context = mock[ProcessorContext]
-    when(context.applicationId).thenReturn("application")
-    when(context.topic).thenReturn("topic")
-    when(context.partition).thenReturn(1)
-    when(context.taskId()).thenReturn(new TaskId(0, 1))
-    context
-  }
-
   private def setContextPartition(partition: Int)(implicit f: FixtureParam): Unit = {
     when(f.context.partition).thenReturn(partition)
-  }
-
-  private def createStore(prefix: String, client: RedisClient, context: ProcessorContext) = {
-    val store = new RedisKeyValueStore[String, String](
-      "store-name",
-      client,
-      (prefix + "v").getBytes(),
-      (prefix + "k").getBytes(),
-      Serdes.String(),
-      Serdes.String(),
-      Comparator.naturalOrder())
-    store.init(context, null)
-    store
   }
 }
