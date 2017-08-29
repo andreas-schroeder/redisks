@@ -1,15 +1,14 @@
 package com.github.andreas_schroeder.redisks
 
 import java.lang.{NullPointerException => NPE}
-import java.net.ServerSocket
-import java.util.Comparator
 
 import com.lambdaworks.redis.{RedisClient, RedisURI}
-import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.KeyValue
-import org.apache.kafka.streams.processor.{ProcessorContext, TaskId}
+import org.apache.kafka.streams.processor.ProcessorContext
 import org.mockito.Mockito.when
+import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{GivenWhenThen, MustMatchers, Outcome, fixture}
 import redis.embedded.RedisServer
 
@@ -19,7 +18,10 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
   with RedisKeyValueStores
   with GivenWhenThen
   with MockitoSugar
-  with MustMatchers {
+  with MustMatchers
+  with Eventually {
+
+  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(100, Millis)))
 
   case class FixtureParam(redisServer: RedisServer,
                           client: RedisClient,
@@ -200,6 +202,8 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       When("adding multiple entries")
       store.putAll(List("a", "b", "c").map(i => new KeyValue(i, i)).asJava)
 
+      eventually { store.approximateNumEntries mustBe 3 }
+
       Then("all added entries can be retrieved")
       store.get("a") mustBe "a"
       store.get("b") mustBe "b"
@@ -214,6 +218,8 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       When("adding multiple entries")
       val kvs = createKeyValues(200)
       store.putAll(kvs.asJava)
+
+      eventually { store.approximateNumEntries mustBe 200 }
 
       Then("all added entries can be retrieved")
       val resultKvs = store.all().asScala.to[Seq]
@@ -238,6 +244,8 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       val kvs = createKeyValues(200)
       store.putAll(kvs.asJava)
 
+      eventually { store.approximateNumEntries() mustBe 200 }
+
       When("aborting the iteration")
       val it = store.all()
       it.next()
@@ -258,7 +266,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       store.putAll(createKeyValues(200).asJava)
 
       Then("approximateNumEntries returns the number of entries")
-      store.approximateNumEntries() mustBe 200
+      eventually { store.approximateNumEntries() mustBe 200 }
     }
   }
 

@@ -15,7 +15,7 @@ import org.apache.kafka.streams.processor.{ProcessorContext, StateStore}
 import org.apache.kafka.streams.state.{KeyValueIterator, KeyValueStore}
 import rx.lang.scala.JavaConversions.toScalaObservable
 import rx.lang.scala.Observable
-import rx.lang.scala.schedulers.ComputationScheduler
+import rx.lang.scala.schedulers.{ComputationScheduler, IOScheduler}
 import rx.lang.scala.subjects.PublishSubject
 import rx.{Observable => JavaObservable}
 
@@ -52,6 +52,8 @@ class RedisKeyValueStore[K,V <: AnyRef](
     logBackoff,
     logBackoffFailure
    )
+
+  private val scheduler = IOScheduler()
 
   private var open = false
   private var context: ProcessorContext = _
@@ -159,9 +161,10 @@ class RedisKeyValueStore[K,V <: AnyRef](
         ScriptOutputType.STATUS,
         Array(prefixedRawKey, keystoreKey),
         rawValue(value), vanillaKey))
+      .observeOn(scheduler)
+      .subscribeOn(scheduler)
       .retryWhen(backoff)
-      .toBlocking
-      .first
+      .subscribe()
   }
 
 
@@ -190,9 +193,11 @@ class RedisKeyValueStore[K,V <: AnyRef](
       keys += vanillaKey
     }
     cmd(_.mset(map))
+      .observeOn(scheduler)
+      .subscribeOn(scheduler)
       .retryWhen(backoff)
       .flatMap(_ => cmd(_.sadd(keystoreKey, keys:_*)).retryWhen(backoff))
-      .toBlocking.first
+      .subscribe()
   }
 
   override def delete(key: K): V = {
