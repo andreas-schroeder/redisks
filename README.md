@@ -24,7 +24,7 @@ StateStoreSupplier<KeyValueStore> store = RedisStore.<String, String>keyValueSto
 
 ## Benchmark results
 
-The benchmark can be found [here](it/test/scala/com.github.andreas_schroeder.redisks.RedisKeyValueStoreBenchmark).
+The benchmark can be found [here](/it/src/test/scala/com/github/andreas_schroeder/redisks/RedisKeyValueStoreBenchmark.scala).
 The results below were obtained on a MacBook Pro (Retina, 15-inch, Mid 2015),
 with a 2,8 GHz Intel Core i7 CPU. Currently, the attainable throughput depends
 significantly on the size of the key-value entries stored.
