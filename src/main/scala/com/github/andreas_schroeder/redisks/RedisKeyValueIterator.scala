@@ -19,7 +19,7 @@ class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] 
   private var peeked: Boolean = false
   private var last: KeyValue[K, V] = _
 
-  override def close(): Unit = {
+  override def close(): Unit = this.synchronized {
     queue.clear()
     last = null
     closedFlag.set(true)
@@ -27,59 +27,55 @@ class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] 
 
   def closed: Boolean = closedFlag.get()
 
-  override def peekNextKey: K = {
+  override def peekNextKey: K = this.synchronized {
     if (peeked) {
       last.key
     } else {
       validateMaybeMoreAvailable()
-      take() match {
-        case Some(kv) =>
+      queue.take() match {
+        case OnNext(kv) =>
           last = kv
           peeked = true
           last.key
-        case None =>
+        case _ =>
+          done = true
           throw new NoSuchElementException()
       }
     }
   }
 
-  private def validateMaybeMoreAvailable(): Unit =
-    if (done && queue.isEmpty) throw new NoSuchElementException
+  private def validateMaybeMoreAvailable(): Unit = if (done && queue.isEmpty) throw new NoSuchElementException
 
-  override def hasNext: Boolean = {
+  override def hasNext: Boolean = this.synchronized {
     if(done) {
       false
     } else if (peeked) {
       true
     } else {
-      take() match {
-        case Some(kv) =>
+      queue.take() match {
+        case OnNext(kv) =>
           last = kv
           peeked = true
           true
-        case None =>
+        case _ =>
+          done = true
           false
       }
     }
   }
 
-  override def next: KeyValue[K, V] = {
+  override def next: KeyValue[K, V] = this.synchronized {
     if (peeked) {
       peeked = false
       last
     } else {
       validateMaybeMoreAvailable()
-      take() match {
-        case Some(kv) => kv
-        case _        => throw new NoSuchElementException()
+      queue.take() match {
+        case OnNext(kv) => kv
+        case _ =>
+          done = true
+          throw new NoSuchElementException
       }
     }
-  }
-
-  private def take(): Option[KeyValue[K, V]] = queue.take() match {
-    case OnNext(kv) => Some(kv)
-    case _ =>
-      done = true
-      None
   }
 }
