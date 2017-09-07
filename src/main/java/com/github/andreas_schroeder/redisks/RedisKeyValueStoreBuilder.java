@@ -12,6 +12,7 @@ public class RedisKeyValueStoreBuilder<K, V> {
     private Serde<K> keySerde;
     private Serde<V> valueSerde;
     private Comparator<K> keyOrdering;
+    private boolean cached;
     private byte[] keyPrefix;
     private byte[] keystoreKey;
 
@@ -31,7 +32,8 @@ public class RedisKeyValueStoreBuilder<K, V> {
                 valueSerde,
                 keyOrdering,
                 keyPrefix,
-                keystoreKey);
+                keystoreKey,
+                cached);
     }
 
 
@@ -57,6 +59,16 @@ public class RedisKeyValueStoreBuilder<K, V> {
 
     public RedisKeyValueStoreBuilder<K, V> withValues(Serde<V> serde) {
         this.valueSerde = serde;
+        return this;
+    }
+
+    public RedisKeyValueStoreBuilder<K, V> cached() {
+        this.cached = true;
+        return this;
+    }
+
+    public RedisKeyValueStoreBuilder<K, V> cached(boolean cached) {
+        this.cached = cached;
         return this;
     }
 

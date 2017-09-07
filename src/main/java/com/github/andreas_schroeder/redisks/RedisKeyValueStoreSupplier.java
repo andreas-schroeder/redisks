@@ -24,6 +24,7 @@ public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyV
     private final Comparator<K> keyOrdering;
     private final byte[] keyPrefix;
     private final byte[] keystoreKey;
+    private final boolean cached;
 
     public RedisKeyValueStoreSupplier(
             String name,
@@ -32,7 +33,8 @@ public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyV
             Serde<V> valueSerde,
             Comparator<K> keyOrdering,
             byte[] keyPrefix,
-            byte[] keystoreKey) {
+            byte[] keystoreKey,
+            boolean cached) {
 
         Objects.requireNonNull(name, "name cannot be null");
         Objects.requireNonNull(redisClient, "redisClient cannot be null");
@@ -48,6 +50,7 @@ public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyV
         this.keyOrdering = keyOrdering;
         this.keyPrefix = keyPrefix;
         this.keystoreKey = keystoreKey;
+        this.cached = cached;
     }
 
 
@@ -59,6 +62,9 @@ public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyV
     @Override
     public KeyValueStore<K, V> get() {
         Objects.requireNonNull(redisClient, "redisClient cannot be null");
+        if(cached) {
+            return cachedStore();
+        }
         return new MeteredKeyValueStore<>(
                 new RedisKeyValueStore<>(name, redisClient, keyPrefix, keystoreKey, keySerde, valueSerde, keyOrdering),
                 "redis-store",

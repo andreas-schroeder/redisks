@@ -9,7 +9,8 @@ import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.serialization.{Serdes, StringSerializer}
 import org.apache.kafka.streams.{KafkaStreams, KeyValue, StreamsConfig}
 import org.apache.kafka.streams.kstream.KStreamBuilder
-import org.apache.kafka.streams.state.QueryableStoreTypes
+import org.apache.kafka.streams.processor.StateStoreSupplier
+import org.apache.kafka.streams.state.{KeyValueStore, QueryableStoreTypes}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{FeatureSpec, GivenWhenThen, MustMatchers}
@@ -20,7 +21,7 @@ import scala.collection.JavaConverters._
 
 class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with GivenWhenThen with EmbeddedKafka with Eventually {
 
-  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(5, Seconds)), interval = scaled(Span(200, Millis)))
+  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(10, Seconds)), interval = scaled(Span(200, Millis)))
 
   feature("KeyValueStore") {
     scenario("KTable x KTable join") {
@@ -101,13 +102,14 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
     }
   }
 
-  private def redis(name: String)(implicit client: RedisClient) = {
+  private def redis(name: String)(implicit client: RedisClient): StateStoreSupplier[KeyValueStore[_, _]] = {
     val s = Serdes.String
     RedisStore.keyValueStore(name)
       .withClient(client)
       .withKeys(s)
       .withValues(s)
       .withKeyComparator(Comparator.naturalOrder[String])
+      .cached()
       .build
   }
 

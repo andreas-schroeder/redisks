@@ -6,10 +6,11 @@ import java.util.Comparator
 import com.lambdaworks.redis.RedisClient
 import org.apache.kafka.common.serialization.Serdes
 import org.apache.kafka.streams.processor.{ProcessorContext, TaskId}
-import org.mockito.Mockito.when
 import org.scalatest.mockito.MockitoSugar
+import org.mockito.Mockito._
 
 trait RedisKeyValueStores extends MockitoSugar {
+
   def freePort = {
     val socket = new ServerSocket(0)
     val port = socket.getLocalPort
