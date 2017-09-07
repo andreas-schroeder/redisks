@@ -1,6 +1,5 @@
 package com.github.andreas_schroeder.redisks
 
-import rx.lang.scala.schedulers.ComputationScheduler
 import rx.lang.scala.{Observable, Scheduler}
 
 import scala.concurrent.duration._
@@ -13,7 +12,7 @@ class CancelableBackoff(
                          retryLogger: (Throwable, Int) => Unit = (_,_) => (),
                          failureLogger: (Throwable) => Unit = _ => ()) {
 
-  def backoff(attempts: Observable[Throwable]): Observable[Any] = backoffOrCancelWhen(false, attempts)
+  def backoff(attempts: Observable[Throwable]): Observable[Any] = backoffOrCancelWhen(cancel = false, attempts)
 
   def backoffOrCancelWhen(cancel: => Boolean, attempts: Observable[Throwable]): Observable[Any] = {
     attempts

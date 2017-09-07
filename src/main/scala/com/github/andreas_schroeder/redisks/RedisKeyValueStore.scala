@@ -152,7 +152,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
     cancelableBackoff.backoffOrCancelWhen(cancel, attempts)
 
 
-  override def put(key: K, value: V): Unit = {
+  override def put(key: K, value: V): Unit = this.synchronized {
     Objects.requireNonNull(key, "key cannot be null")
     Objects.requireNonNull(value, "value cannot be null")
     val (vanillaKey, prefixedRawKey) = prefixedRawKeys(key)
@@ -168,7 +168,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
   }
 
 
-  override def putIfAbsent(key: K, value: V): V = {
+  override def putIfAbsent(key: K, value: V): V = this.synchronized {
     Objects.requireNonNull(key, "key cannot be null")
     Objects.requireNonNull(value, "value cannot be null")
     val (vanillaKey, prefixedRawKey) = prefixedRawKeys(key)
@@ -184,7 +184,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
       .headOrElse(nullValue)
   }
 
-  override def putAll(entries: util.List[KeyValue[K, V]]): Unit = {
+  override def putAll(entries: util.List[KeyValue[K, V]]): Unit = this.synchronized {
     val map: util.Map[Bytes, Bytes] = new util.HashMap(entries.size)
     val keys = new ListBuffer[Bytes]
     for (entry <- entries.asScala) {
@@ -200,7 +200,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
       .subscribe()
   }
 
-  override def delete(key: K): V = {
+  override def delete(key: K): V = this.synchronized {
     Objects.requireNonNull(key, "key cannot be null")
     val (vanillaKey, prefixedRawKey) = prefixedRawKeys(key)
     cmd(_.evalsha[Bytes](
@@ -214,7 +214,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
       .headOrElse(nullValue)
   }
 
-  override def get(key: K): V = {
+  override def get(key: K): V = this.synchronized {
     Objects.requireNonNull(key, "key cannot be null")
     cmd(_.get(prefixedRawKey(key)))
       .retryWhen(backoff)
@@ -223,12 +223,12 @@ class RedisKeyValueStore[K,V <: AnyRef](
       .headOrElse(nullValue)
   }
 
-  override def range(from: K, to: K): KeyValueIterator[K, V] = {
+  override def range(from: K, to: K): KeyValueIterator[K, V] = this.synchronized {
     import keyOrdering._
     all((k: K) => from <= k && k <= to)
   }
 
-  override def all: KeyValueIterator[K, V] = all((k: K) => true)
+  override def all: KeyValueIterator[K, V] = this.synchronized { all((k: K) => true) }
 
   private def all(predicate: K => Boolean): KeyValueIterator[K, V] = {
     val batchSize: Int = 50
@@ -297,10 +297,11 @@ class RedisKeyValueStore[K,V <: AnyRef](
     it
   }
 
-  override def approximateNumEntries: Long =
+  override def approximateNumEntries: Long = this.synchronized {
     cmd(_.scard(keystoreKeyWithPartition(context.taskId().partition)))
       .toBlocking
       .first
+  }
 }
 
 object RedisKeyValueStore extends StrictLogging {
