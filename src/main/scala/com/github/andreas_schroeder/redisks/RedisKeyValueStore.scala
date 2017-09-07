@@ -28,7 +28,7 @@ import scala.io.Source
 
 class RedisKeyValueStore[K,V <: AnyRef](
                                val name: String,
-                               redisClient: RedisClient,
+                               connectionProvider: RedisConnectionProvider,
                                keyPrefix: Array[Byte],
                                keyStoreKeyIn: Array[Byte],
                                keySerde: Serde[K],
@@ -70,7 +70,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
     val codec: RedisToKafkaCodec[K, V] = RedisToKafkaCodec.fromSerdes(if (keySerde == null) context.keySerde.asInstanceOf[Serde[K]]
     else keySerde, if (valueSerde == null) context.valueSerde.asInstanceOf[Serde[V]]
     else valueSerde, name)
-    val connection: StatefulRedisConnection[Bytes, Bytes] = redisClient.connect(ByteArrayCodec.INSTANCE)
+    val connection: StatefulRedisConnection[Bytes, Bytes] = connectionProvider.connect()
     val reactive: RedisReactiveCommands[Bytes, Bytes] = connection.reactive
     if (root != null) context.register(root, false, (_, _) => ())
 

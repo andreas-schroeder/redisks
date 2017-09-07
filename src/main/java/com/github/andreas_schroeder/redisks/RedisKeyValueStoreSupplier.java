@@ -1,6 +1,5 @@
 package com.github.andreas_schroeder.redisks;
 
-import com.lambdaworks.redis.RedisClient;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
@@ -13,12 +12,12 @@ import java.lang.reflect.Constructor;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
-import java.util.Objects;
+import static java.util.Objects.requireNonNull;
 
 public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyValueStore> {
 
     private final String name;
-    private final RedisClient redisClient;
+    private final RedisConnectionProvider connectionProvider;
     private final Serde<K> keySerde;
     private final Serde<V> valueSerde;
     private final Comparator<K> keyOrdering;
@@ -28,26 +27,26 @@ public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyV
 
     public RedisKeyValueStoreSupplier(
             String name,
-            RedisClient redisClient,
+            RedisConnectionProvider connectionProvider,
             Serde<K> keySerde,
             Serde<V> valueSerde,
-            Comparator<K> keyOrdering,
+            Comparator<K> keyComparator,
             byte[] keyPrefix,
             byte[] keystoreKey,
             boolean cached) {
 
-        Objects.requireNonNull(name, "name cannot be null");
-        Objects.requireNonNull(redisClient, "redisClient cannot be null");
-        Objects.requireNonNull(keySerde, "keySerde cannot be null");
-        Objects.requireNonNull(valueSerde, "valueSerde cannot be null");
-        Objects.requireNonNull(keyOrdering, "keyOrdering cannot be null");
-        Objects.requireNonNull(keyPrefix, "keyPrefix cannot be null");
+        requireNonNull(name, "name cannot be null");
+        requireNonNull(connectionProvider, "connectionProvider cannot be null");
+        requireNonNull(keySerde, "keySerde cannot be null");
+        requireNonNull(valueSerde, "valueSerde cannot be null");
+        requireNonNull(keyComparator, "keyComparator cannot be null");
+        requireNonNull(keyPrefix, "keyPrefix cannot be null");
 
         this.name = name;
-        this.redisClient = redisClient;
+        this.connectionProvider = connectionProvider;
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
-        this.keyOrdering = keyOrdering;
+        this.keyOrdering = keyComparator;
         this.keyPrefix = keyPrefix;
         this.keystoreKey = keystoreKey;
         this.cached = cached;
@@ -61,23 +60,21 @@ public class RedisKeyValueStoreSupplier<K, V> implements StateStoreSupplier<KeyV
 
     @Override
     public KeyValueStore<K, V> get() {
-        Objects.requireNonNull(redisClient, "redisClient cannot be null");
         if(cached) {
             return cachedStore();
         }
         return new MeteredKeyValueStore<>(
-                new RedisKeyValueStore<>(name, redisClient, keyPrefix, keystoreKey, keySerde, valueSerde, keyOrdering),
+                new RedisKeyValueStore<>(name, connectionProvider, keyPrefix, keystoreKey, keySerde, valueSerde, keyOrdering),
                 "redis-store",
                 Time.SYSTEM);
     }
 
     @SuppressWarnings("unchecked")
     private KeyValueStore<K,V> cachedStore() {
-        // for future reference - if needed.
-        // note that ordering cannot be considered and is effectively lost.
+        // note that when using caching ordering cannot be considered and is effectively lost.
         Comparator<Bytes> ordering = Comparator.naturalOrder();
         KeyValueStore<Bytes, byte[]> redis = new MeteredKeyValueStore<>(
-                new RedisKeyValueStore<>(name, redisClient, keyPrefix, keystoreKey, Serdes.Bytes(), Serdes.ByteArray(), ordering),
+                new RedisKeyValueStore<>(name, connectionProvider, keyPrefix, keystoreKey, Serdes.Bytes(), Serdes.ByteArray(), ordering),
                 "redis-store",
                 Time.SYSTEM);
         try {

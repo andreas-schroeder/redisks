@@ -30,7 +30,7 @@ trait RedisKeyValueStores extends MockitoSugar {
   def createStore(prefix: String, client: RedisClient, context: ProcessorContext) = {
     val store = new RedisKeyValueStore[String, String](
       "store-name",
-      client,
+      RedisConnectionProvider.fromClient(client),
       (prefix + "v").getBytes(),
       (prefix + "k").getBytes(),
       Serdes.String(),
