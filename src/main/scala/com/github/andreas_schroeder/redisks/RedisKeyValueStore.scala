@@ -4,10 +4,9 @@ import java.io.IOException
 import java.util
 import java.util.{Comparator, Objects}
 
-import com.lambdaworks.redis.{RedisClient, ScanArgs, ScriptOutputType, ValueScanCursor}
+import com.lambdaworks.redis.{ScanArgs, ScriptOutputType, ValueScanCursor}
 import com.lambdaworks.redis.api.StatefulRedisConnection
 import com.lambdaworks.redis.api.rx.RedisReactiveCommands
-import com.lambdaworks.redis.codec.ByteArrayCodec
 import com.typesafe.scalalogging.StrictLogging
 import org.apache.kafka.common.serialization.Serde
 import org.apache.kafka.streams.KeyValue
@@ -233,7 +232,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
   private def all(predicate: K => Boolean): KeyValueIterator[K, V] = {
     val batchSize: Int = 50
     val partition = context.taskId().partition
-    val it: RedisKeyValueIterator[K, V] = new RedisKeyValueIterator[K, V](batchSize)
+    val it: RedisKeyValueIterator[K, V] = new RedisKeyValueIterator[K, V](batchSize, name)
 
     val partitionKeystoreKey = keystoreKeyWithPartition(partition).clone()
 

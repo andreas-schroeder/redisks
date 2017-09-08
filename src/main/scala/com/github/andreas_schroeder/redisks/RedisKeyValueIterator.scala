@@ -9,7 +9,7 @@ import org.apache.kafka.streams.state.KeyValueIterator
 import rx.lang.scala.Notification
 import rx.lang.scala.Notification.OnNext
 
-class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] {
+class RedisKeyValueIterator[K,V](bufferSize: Int, storeName: String) extends KeyValueIterator[K,V] {
 
   type Item = Notification[KeyValue[K,V]]
   val queue: BlockingQueue[Item] = new ArrayBlockingQueue[Item](bufferSize + 1)
@@ -28,6 +28,7 @@ class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] 
   def closed: Boolean = closedFlag.get()
 
   override def peekNextKey: K = this.synchronized {
+    validateOpen()
     if (peeked) {
       last.key
     } else {
@@ -44,9 +45,12 @@ class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] 
     }
   }
 
+  private def validateOpen(): Unit = if(closedFlag.get) throw new IllegalStateException(s"Iterator from store $storeName is closed")
+
   private def validateMaybeMoreAvailable(): Unit = if (done && queue.isEmpty) throw new NoSuchElementException
 
   override def hasNext: Boolean = this.synchronized {
+    validateOpen()
     if(done) {
       false
     } else if (peeked) {
@@ -65,6 +69,7 @@ class RedisKeyValueIterator[K,V](bufferSize: Int) extends KeyValueIterator[K,V] 
   }
 
   override def next: KeyValue[K, V] = this.synchronized {
+    validateOpen()
     if (peeked) {
       peeked = false
       last
