@@ -1,0 +1,11 @@
+language: scala
+scala:
+   - 2.12.3
+
+after_success:
+  - >
+    if [ "$TRAVIS_PULL_REQUEST" = "false" -a "$TRAVIS_REPO_SLUG" = "andreas-schroeder/redisks" ]; then
+      if [[ $TRAVIS_TAG ]]; then
+        ./gradlew bintrayUpload
+      fi
+    fi

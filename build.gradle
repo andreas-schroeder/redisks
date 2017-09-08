@@ -1,11 +1,13 @@
 plugins {
     id 'com.github.maiflai.scalatest' version '0.16'
+    id 'com.jfrog.bintray' version '1.7.3'
 }
 
 allprojects {
     apply plugin: 'scala'
     apply plugin: 'idea'
     apply plugin: 'com.github.maiflai.scalatest'
+    apply plugin: 'maven-publish'
 
     sourceCompatibility = '1.8'
     group = 'com.github.andreas-schroeder'
@@ -64,6 +66,28 @@ jar {
         attributes("Implementation-Title": "Redisks",
                    "Implementation-Version": version)
     }
+}
+
+publishing {
+    publications {
+        RedisksPublication(MavenPublication) {
+            from components.java
+            groupId 'com.github.andreas-schroeder'
+            artifactId 'redisks'
+            version '0.0.0'
+        }
+    }
+}
+
+bintray {
+    user = System.getenv('BINTRAY_USER')
+    key = System.getenv('BINTRAY_KEY')
+    pkg {
+        repo = 'maven'
+        name = 'redisks'
+        userOrg = 'and-schroeder'
+    }
+    publications = ['RedisksPublication']
 }
 
 project(':it') {
