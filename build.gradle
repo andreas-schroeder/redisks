@@ -10,6 +10,8 @@ allprojects {
     apply plugin: 'maven-publish'
 
     sourceCompatibility = '1.8'
+    group = artifactGroup
+    version = artifactVersion
 
     sourceSets {
         main {
@@ -63,9 +65,9 @@ publishing {
     publications {
         RedisksPublication(MavenPublication) {
             from components.java
-            groupId 'com.github.andreas-schroeder'
-            artifactId 'redisks_2.12'
-            version '0.0.0'
+            groupId artifactGroup
+            artifactId "redisks_${scalaVersion}"
+            version artifactVersion
         }
     }
 }
@@ -90,4 +92,4 @@ project(':it') {
     }
 }
 
-def scala(Object dep) { "${dep.group}:${dep.name}_2.12:${dep.version}" }
+def scala(Object dep) { "${dep.group}:${dep.name}_${scalaVersion}:${dep.version}" }
