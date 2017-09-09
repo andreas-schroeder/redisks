@@ -45,6 +45,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
 
       Given("A store with an entry for key 'k'")
       store.put("k", "value")
+      eventually { store.approximateNumEntries mustBe 1 }
 
       When("the value for 'k' is retrieved")
       val v = store.get("k")
@@ -59,6 +60,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       When("adding two entries with different values")
       store.put("key1", "value1")
       store.put("key2", "value2")
+      eventually { store.approximateNumEntries mustBe 2 }
 
       Then("retrieving the entries returns the stored values")
       store.get("key1") mustBe "value1"
@@ -72,8 +74,11 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       When("adding entries for different partitions")
       setContextPartition(1)
       store.put("key1", "value1")
+      eventually { store.approximateNumEntries mustBe 1 }
+
       setContextPartition(2)
       store.put("key2", "value2")
+      eventually { store.approximateNumEntries mustBe 1 }
 
       Then("the entries are only visible for their respective partition store")
       setContextPartition(1)
@@ -91,7 +96,8 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       When("adding entries to different stores")
       store.put("key1", "value1")
       secondStore.put("key2", "value2")
-
+      eventually { store.approximateNumEntries mustBe 1 }
+      eventually { secondStore.approximateNumEntries mustBe 1 }
 
       Then("the entries are only visible in the respective store")
       store.get("key1") mustBe "value1"
@@ -108,6 +114,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
 
       Given("A store with an entry for key 'k'")
       store.put("k", "value 1")
+      eventually { store.approximateNumEntries mustBe 1 }
 
       When("calling putIfAbsent with that key")
       val current = store.putIfAbsent("k", "value 2")
@@ -155,6 +162,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
 
       Given("A store with an entry for key 'k'")
       store.put("k", "value")
+      eventually { store.approximateNumEntries mustBe 1 }
 
       When("deleting this entry")
       val value = store.delete("k")
@@ -182,8 +190,11 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       Given("a store with an entry for key 'k' in two partitions")
       setContextPartition(1)
       store.put("k", "value1")
+      eventually { store.approximateNumEntries mustBe 1 }
+
       setContextPartition(2)
       store.put("k", "value2")
+      eventually { store.approximateNumEntries mustBe 1 }
 
       When("deleting the entry for one partition")
       setContextPartition(1)
