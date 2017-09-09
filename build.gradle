@@ -10,8 +10,6 @@ allprojects {
     apply plugin: 'maven-publish'
 
     sourceCompatibility = '1.8'
-    group = 'com.github.andreas-schroeder'
-    version = '0.0.0'
 
     sourceSets {
         main {
@@ -61,19 +59,12 @@ allprojects {
     }
 }
 
-jar {
-    manifest {
-        attributes("Implementation-Title": "Redisks",
-                   "Implementation-Version": version)
-    }
-}
-
 publishing {
     publications {
         RedisksPublication(MavenPublication) {
             from components.java
             groupId 'com.github.andreas-schroeder'
-            artifactId 'redisks'
+            artifactId 'redisks_2.12'
             version '0.0.0'
         }
     }
