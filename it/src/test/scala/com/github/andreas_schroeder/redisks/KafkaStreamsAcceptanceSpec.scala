@@ -21,7 +21,8 @@ import scala.collection.JavaConverters._
 
 class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with GivenWhenThen with EmbeddedKafka with Eventually {
 
-  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(10, Seconds)), interval = scaled(Span(200, Millis)))
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = scaled(Span(10, Seconds)), interval = scaled(Span(200, Millis)))
 
   feature("KeyValueStore") {
     scenario("KTable x KTable join") {
@@ -32,7 +33,7 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
             val topicOne = builder.table[String, String]("topic-one", redis("s1"))
             val topicTwo = builder.table[String, String]("topic-two", redis("s2"))
             topicOne.join(topicTwo, (one: String, two: String) => one + "x" + two).to("topic-out")
-          } { streams =>
+          } { _ =>
             Given("a streams app joining two topics")
             When("sending messages to the join input topics")
             send("topic-one", "c" -> "c", "b" -> "b", "a" -> "a")
@@ -41,7 +42,7 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
             Then("joined records are sent to the output topic")
             val messages = consumeNumberStringMessagesFrom("topic-out", 2)
             messages must have size 2
-            messages must contain allOf ("axA", "bxB")
+            messages must contain allOf("axA", "bxB")
           }
         }
       }
@@ -51,14 +52,12 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
       withRunningKafka {
         createTopics("topic-one")
         withRedis { implicit client =>
-          withStreamsApp { builder =>
-            val topicOne = builder.table[String, String]("topic-one", redis("s1"))
-          } { streams =>
+          withStreamsApp(_.table[String, String]("topic-one", redis("s1"))) { streams =>
 
             eventually { streams.allMetadata().isEmpty mustBe false }
 
-            Given("a streams app with a KTable and a queryable state store")
-            val store = streams.store("s1", QueryableStoreTypes.keyValueStore[String, String]())
+            Given("an app with a KTable and a queryable state store")
+            val store = streams.store("s1", keyValueStore)
             When("sending messages to the KTable input topic")
             send("topic-one", "c" -> "c", "b" -> "b", "a" -> "a")
 
@@ -73,7 +72,35 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
         }
       }
     }
+
+    scenario("Application restart") {
+      withRunningKafka {
+        createTopics("topic-one", "topic-two")
+        withRedis { implicit client =>
+
+          Given("an app with a state store")
+          withStreamsApp(_.table[String, String]("topic-one", redis("s1"))) { streams =>
+            eventually { streams.allMetadata().isEmpty mustBe false }
+            send("topic-one", "c" -> "c", "b" -> "b", "a" -> "a")
+            val store = streams.store("s1", keyValueStore)
+            eventually { store.approximateNumEntries() mustBe >=(3L) }
+          }
+
+          When("restarting the app")
+          // using an empty topic ensures that the state store content originates from the previous app
+          withStreamsApp(_.table[String, String]("topic-two", redis("s1"))) { streams =>
+            eventually { streams.allMetadata().isEmpty mustBe false }
+
+            Then("the state survives the app restart")
+            val store = streams.store("s1", keyValueStore)
+            eventually { store.approximateNumEntries() mustBe >=(3L) }
+          }
+        }
+      }
+    }
   }
+
+  val keyValueStore = QueryableStoreTypes.keyValueStore[String, String]()
 
   private def streamsConfig = {
     val port = embeddedKafkaConfig.kafkaPort
@@ -125,19 +152,19 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
     }
   }
 
-  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(
+  implicit val embeddedKafkaConfig: EmbeddedKafkaConfig = EmbeddedKafkaConfig(
     freePort,
     freePort,
     Map("offsets.topic.replication.factor" -> "1"),
     Map.empty,
     Map.empty)
 
-  implicit val stringSerializer = new StringSerializer
+  implicit val stringSerializer: StringSerializer = new StringSerializer
 
   private def createTopics(topicNames: String*): Unit =
     topicNames.foreach(name => createCustomTopic(name, partitions = 2))
 
-  private def send(topic: String, records: (String, String)*) =
+  private def send(topic: String, records: (String, String)*): Unit =
     for((key, value) <- records) {
       publishToKafka(topic, key, value)
     }

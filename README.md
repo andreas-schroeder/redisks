@@ -57,6 +57,9 @@ StateStoreSupplier<KeyValueStore> store = RedisStore.<String, String>keyValueSto
 
 ```
 
+Some examples for using the Redis state stores can be found in the
+[acceptance tests](it/src/test/scala/com/github/andreas_schroeder/redisks/KafkaStreamsAcceptanceSpec.scala).
+
 ## Benchmark results
 
 The benchmark can be found [here](/it/src/main/scala/com/github/andreas_schroeder/redisks/RedisKeyValueStoreBenchmark.scala).
