@@ -44,6 +44,7 @@ allprojects {
         testCompile       group: 'org.apache.kafka',     name: 'kafka-streams',            version: '0.11.0.0'
         testCompile       group: 'org.apache.zookeeper', name: 'zookeeper',                version: '3.4.10', ext: 'pom'
         testCompile       group: 'org.slf4j',            name: 'slf4j-log4j12',            version: '1.7.25'
+        testCompile       group: 'log4j',                name: 'log4j',                    version: '1.2.17'
         testCompile scala(group: 'net.manub',            name: 'scalatest-embedded-kafka', version: '0.15.1')
         testCompile scala(group: 'org.scalatest',        name: 'scalatest',                version: '3.0.1')
 
