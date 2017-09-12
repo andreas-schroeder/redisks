@@ -4,9 +4,11 @@ import java.io.IOException
 import java.util
 import java.util.{Comparator, Objects}
 
-import com.lambdaworks.redis.{ScanArgs, ScriptOutputType, ValueScanCursor}
+import com.lambdaworks.redis._
 import com.lambdaworks.redis.api.StatefulRedisConnection
+import com.lambdaworks.redis.api.async.RedisAsyncCommands
 import com.lambdaworks.redis.api.rx.RedisReactiveCommands
+import com.lambdaworks.redis.api.sync.RedisCommands
 import com.typesafe.scalalogging.StrictLogging
 import org.apache.kafka.common.serialization.Serde
 import org.apache.kafka.streams.KeyValue
@@ -24,7 +26,6 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
 
-
 class RedisKeyValueStore[K,V <: AnyRef](
                                val name: String,
                                connectionProvider: RedisConnectionProvider,
@@ -33,7 +34,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
                                keySerde: Serde[K],
                                valueSerde: Serde[V],
                                keyComparator: Comparator[K]
-                             ) extends KeyValueStore[K,V] with StrictLogging {
+                             ) extends KeyValueStore[K,V] with StrictLogging with RedisFutures {
   import RedisKeyValueStore._
 
   type Bytes = Array[Byte]
@@ -44,7 +45,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
   private val keyOrdering: Ordering[K] = Ordering.comparatorToOrdering(keyComparator)
 
   private val cancelableBackoff = new CancelableBackoff(
-    1.second,
+    100.millis,
     60.seconds,
     100000,
     ComputationScheduler(),
@@ -56,7 +57,9 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
   private var open = false
   private var context: ProcessorContext = _
-  private var redis: RedisReactiveCommands[Bytes, Bytes] = _
+  private var rxRedis: RedisReactiveCommands[Bytes, Bytes] = _
+  private var asyncRedis: RedisAsyncCommands[Bytes, Bytes] = _
+  private var syncRedis: RedisCommands[Bytes, Bytes] = _
 
   private var codec: RedisToKafkaCodec[K, V] = _
   private var putIfAbsentScript: String = _
@@ -70,13 +73,18 @@ class RedisKeyValueStore[K,V <: AnyRef](
     else keySerde, if (valueSerde == null) context.valueSerde.asInstanceOf[Serde[V]]
     else valueSerde, name)
     val connection: StatefulRedisConnection[Bytes, Bytes] = connectionProvider.connect()
-    val reactive: RedisReactiveCommands[Bytes, Bytes] = connection.reactive
+    val rxRedis = connection.reactive
+    val asyncRedis = connection.async
+    val syncRedis = connection.sync
+
     if (root != null) context.register(root, false, (_, _) => ())
 
     this.synchronized {
       this.context = context
       this.codec = codec
-      this.redis = reactive
+      this.rxRedis = rxRedis
+      this.asyncRedis = asyncRedis
+      this.syncRedis = syncRedis
     }
 
     val putIfAbsentScript: String = scriptLoad(PUT_IF_ABSENT_SCRIPT)
@@ -102,11 +110,12 @@ class RedisKeyValueStore[K,V <: AnyRef](
   }
 
   override def flush(): Unit = {
-    redis.getStatefulConnection.flushCommands()
+    rxRedis.getStatefulConnection.flushCommands()
   }
 
   override def close(): Unit = {
-    redis.close()
+    rxRedis.close()
+    shutdown()
     open = false
   }
 
@@ -137,7 +146,7 @@ class RedisKeyValueStore[K,V <: AnyRef](
   private def key(rawKey: Bytes): K = codec.decodeKey(rawKey)
 
   private def cmd[T](f: RedisReactiveCommands[Bytes, Bytes] => JavaObservable[T]): Observable[T] =
-    toScalaObservable(f(redis))
+    toScalaObservable(f(rxRedis))
 
   private def logBackoff(ex: Throwable, tryNumber: Int): Unit =
     logger.warn("Attempt {} failed with {}: {}", tryNumber, ex.getClass.getSimpleName, ex.getMessage)
@@ -155,17 +164,13 @@ class RedisKeyValueStore[K,V <: AnyRef](
     Objects.requireNonNull(key, "key cannot be null")
     Objects.requireNonNull(value, "value cannot be null")
     val (vanillaKey, prefixedRawKey) = prefixedRawKeys(key)
-    cmd(_.evalsha(
+    asScalaWithRetry(asyncRedis.evalsha(
         putScript,
         ScriptOutputType.STATUS,
         Array(prefixedRawKey, keystoreKey),
-        rawValue(value), vanillaKey))
-      .observeOn(scheduler)
-      .subscribeOn(scheduler)
-      .retryWhen(backoff)
-      .subscribe()
+        rawValue(value), vanillaKey),
+      cancelableBackoff.backoffTime, cancelableBackoff.maxTries)
   }
-
 
   override def putIfAbsent(key: K, value: V): V = this.synchronized {
     Objects.requireNonNull(key, "key cannot be null")
@@ -215,11 +220,17 @@ class RedisKeyValueStore[K,V <: AnyRef](
 
   override def get(key: K): V = this.synchronized {
     Objects.requireNonNull(key, "key cannot be null")
-    cmd(_.get(prefixedRawKey(key)))
-      .retryWhen(backoff)
-      .map(this.value)
-      .toBlocking
-      .headOrElse(nullValue)
+    val rawKey = prefixedRawKey(key)
+
+    def doGet(tryCount: Int): V = try {
+      value(syncRedis.get(rawKey))
+    } catch {
+      case RecoverableRedisException(_) if tryCount <= cancelableBackoff.maxTries =>
+        Thread.sleep(cancelableBackoff.backoffTime(tryCount).toMillis)
+        doGet(tryCount + 1)
+    }
+
+    doGet(1)
   }
 
   override def range(from: K, to: K): KeyValueIterator[K, V] = this.synchronized {

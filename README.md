@@ -70,7 +70,7 @@ significantly on the size of the key-value entries stored.
 
 | key/value size  |  put throughput  | get throughput |
 |---|---|---|
-| 100 bytes   |  2.00 MiB/Sec |  1.36 MiB/Sec |
-| 1024 bytes  | 26.43 MiB/Sec | 12.11 MiB/Sec |
-| 2048 bytes  | 46.12 MiB/Sec | 21.20 MiB/Sec |
-| 4000 bytes  | 71.24 MiB/Sec | 39.27 MiB/Sec |
+| 100 bytes   |  6.04 MiB/Sec |  2.23 MiB/Sec |
+| 1024 bytes  | 57.28 MiB/Sec | 19.43 MiB/Sec |
+| 2048 bytes  | 94.58 MiB/Sec | 33.13 MiB/Sec |
+| 4000 bytes  | 129.53 MiB/Sec | 50.79 MiB/Sec |

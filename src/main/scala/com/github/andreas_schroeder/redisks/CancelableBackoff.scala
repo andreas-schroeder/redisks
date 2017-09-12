@@ -5,9 +5,9 @@ import rx.lang.scala.{Observable, Scheduler}
 import scala.concurrent.duration._
 
 class CancelableBackoff(
-                         startBackoff: Duration,
-                         maxBackoff: Duration,
-                         maxTries: Int = 3,
+                         startBackoff: FiniteDuration,
+                         maxBackoff: FiniteDuration,
+                         val maxTries: Int = 3,
                          scheduler: Scheduler,
                          retryLogger: (Throwable, Int) => Unit = (_,_) => (),
                          failureLogger: (Throwable) => Unit = _ => ()) {
@@ -18,8 +18,10 @@ class CancelableBackoff(
     attempts
       .zipWith(Observable.from(1 to maxTries + 1))(logRetry)
       .filter(i => !cancel && i <= maxTries)
-      .flatMap(i => Observable.timer(maxBackoff.min(i * i * startBackoff), scheduler))
+      .flatMap(i => Observable.timer(backoffTime(i), scheduler))
   }
+
+  def backoffTime(tryCount: Int): FiniteDuration = maxBackoff.min((tryCount * tryCount) * startBackoff)
 
   private def logRetry(ex: Throwable, number: Int): Int = {
     if (number <= maxTries) {
