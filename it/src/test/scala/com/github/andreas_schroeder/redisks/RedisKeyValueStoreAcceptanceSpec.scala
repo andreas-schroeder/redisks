@@ -21,7 +21,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
   with MustMatchers
   with Eventually {
 
-  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(100, Millis)))
+  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(50, Millis)))
 
   case class FixtureParam(redisServer: RedisServer,
                           client: RedisClient,
@@ -72,20 +72,20 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
     scenario("Store for two partitions") { implicit fixture =>
       import fixture._
       When("adding entries for different partitions")
-      setContextPartition(1)
+      setContextPartition(0)
       store.put("key1", "value1")
       eventually { store.approximateNumEntries mustBe 1 }
 
-      setContextPartition(2)
+      setContextPartition(1)
       store.put("key2", "value2")
       eventually { store.approximateNumEntries mustBe 1 }
 
       Then("the entries are only visible for their respective partition store")
-      setContextPartition(1)
+      setContextPartition(0)
       store.get("key1") mustBe "value1"
       store.get("key2") mustBe null
 
-      setContextPartition(2)
+      setContextPartition(1)
       store.get("key1") mustBe null
       store.get("key2") mustBe "value2"
     }
@@ -188,20 +188,20 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       import fixture._
 
       Given("a store with an entry for key 'k' in two partitions")
-      setContextPartition(1)
+      setContextPartition(0)
       store.put("k", "value1")
       eventually { store.approximateNumEntries mustBe 1 }
 
-      setContextPartition(2)
+      setContextPartition(1)
       store.put("k", "value2")
       eventually { store.approximateNumEntries mustBe 1 }
 
       When("deleting the entry for one partition")
-      setContextPartition(1)
+      setContextPartition(0)
       store.delete("k")
 
       Then("the second partition is unaffected")
-      setContextPartition(2)
+      setContextPartition(1)
       store.get("k") mustBe "value2"
     }
   }
@@ -316,6 +316,7 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
     } finally {
       fixture.store.close()
       fixture.secondStore.close()
+      client.shutdown()
       server.stop()
     }
   }

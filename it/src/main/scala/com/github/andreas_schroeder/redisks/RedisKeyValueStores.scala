@@ -22,14 +22,14 @@ trait RedisKeyValueStores extends MockitoSugar {
     val context = mock[ProcessorContext]
     when(context.applicationId).thenReturn("application")
     when(context.topic).thenReturn("topic")
-    when(context.partition).thenReturn(1)
-    when(context.taskId()).thenReturn(new TaskId(0, 1))
+    when(context.partition).thenReturn(0)
+    when(context.taskId()).thenReturn(new TaskId(0, 0))
     context
   }
 
   def createStore(prefix: String, client: RedisClient, context: ProcessorContext) = {
     val store = new RedisKeyValueStore[String, String](
-      "store-name",
+      prefix,
       RedisConnectionProvider.fromClient(client),
       (prefix + "v").getBytes(),
       (prefix + "k").getBytes(),

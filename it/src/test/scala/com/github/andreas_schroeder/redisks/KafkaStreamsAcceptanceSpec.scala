@@ -6,7 +6,8 @@ import java.util.{Comparator, Properties}
 
 import com.lambdaworks.redis.{RedisClient, RedisURI}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.apache.kafka.common.serialization.{Serdes, StringSerializer}
+import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
+import org.apache.kafka.common.serialization.{Serdes, StringDeserializer, StringSerializer}
 import org.apache.kafka.streams.{KafkaStreams, KeyValue, StreamsConfig}
 import org.apache.kafka.streams.kstream.KStreamBuilder
 import org.apache.kafka.streams.processor.StateStoreSupplier
@@ -17,7 +18,7 @@ import org.scalatest.{FeatureSpec, GivenWhenThen, MustMatchers}
 import redis.embedded.RedisServer
 
 import scala.collection.JavaConverters._
-
+import scala.concurrent.duration._
 
 class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with GivenWhenThen with EmbeddedKafka with Eventually {
 
@@ -28,6 +29,8 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
     scenario("KTable x KTable join") {
       withRunningKafka {
         createTopics("topic-one", "topic-two", "topic-out")
+        eventually { listTopics() mustBe Set("topic-one", "topic-two", "topic-out") }
+
         withRedis { implicit client =>
           withStreamsApp { builder =>
             val topicOne = builder.table[String, String]("topic-one", redis("s1"))
@@ -40,7 +43,7 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
             send("topic-two", "d" -> "D", "a" -> "A", "b" -> "B")
 
             Then("joined records are sent to the output topic")
-            val messages = consumeNumberStringMessagesFrom("topic-out", 2)
+            val messages = consumeNumberMessagesFromTopics(Set("topic-out"), 2, timeout = 20.seconds).apply("topic-out")
             messages must have size 2
             messages must contain allOf("axA", "bxB")
           }
@@ -148,6 +151,7 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
     try {
       body(client)
     } finally {
+      client.shutdown()
       redisServer.stop()
     }
   }
@@ -161,8 +165,20 @@ class KafkaStreamsAcceptanceSpec extends FeatureSpec with MustMatchers with Give
 
   implicit val stringSerializer: StringSerializer = new StringSerializer
 
+  implicit val stringDeserializer: StringDeserializer = new StringDeserializer
+
   private def createTopics(topicNames: String*): Unit =
     topicNames.foreach(name => createCustomTopic(name, partitions = 2))
+
+
+  private def listTopics(): Set[String] = {
+    val props = new Properties()
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + embeddedKafkaConfig.kafkaPort)
+    val consumer = new KafkaConsumer[String, String](props, stringDeserializer, stringDeserializer)
+    val topics = consumer.listTopics().asScala.keys.toSet
+    consumer.close()
+    topics
+  }
 
   private def send(topic: String, records: (String, String)*): Unit =
     for((key, value) <- records) {
