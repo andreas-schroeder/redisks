@@ -5,24 +5,36 @@ import redis.embedded.RedisServer
 
 import scala.util.Random
 
-class RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
+object RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
 
   val port = freePort
   val server = RedisServer.builder().setting("""save """"").port(port).build()
-  val context = createContext
-  val client = RedisClient.create(RedisURI.create("localhost", port))
   server.start()
+
+  val context = createContext
+
+  val client = RedisClient.create(RedisURI.create("localhost", port))
+
+  val admin = new RedisStoreAdmin(RedisConnectionProvider.fromClient(client))
+  var counter = 0
+
+  def nextStoreName(): String = {
+    counter += 1
+    s"store-$counter"
+  }
 
   def runBenchmark(entriesCount: Int, entryBytes: Int) = {
     val keyValues = createKeyValues(entriesCount, entryBytes)
-    val all = for (_ <- 0 to 3) yield {
+    val all = for (pass <- 0 to 3) yield {
       System.gc()
-      val store = createStore("store", client, context)
+      val storeName = nextStoreName()
+      val store = createStore(storeName, client, context)
       val putStart = System.currentTimeMillis()
-      keyValues.foreach(kv => store.put(kv._1, kv._2))
+      keyValues.foreach{ kv => store.put(kv._1, kv._2) }
       store.flush()
-      while (store.approximateNumEntries < entriesCount) {
-        Thread.sleep(50)
+      val last = keyValues.last
+      while (store.approximateNumEntries != entriesCount && store.get(last._1) != last._2) {
+        Thread.sleep(20)
       }
       val putDuration = System.currentTimeMillis() - putStart
       System.gc()
@@ -31,6 +43,7 @@ class RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
       val getDuration = System.currentTimeMillis() - getStart
       val r = BenchmarkResults(getDuration, putDuration, entriesCount, entryBytes)
       store.close()
+      admin.clearStore(storeName, 1)
       println(r.reportLine)
       r
     }
@@ -57,6 +70,11 @@ class RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
     }
     keys.map(k => (k, rnd.nextString(entryBytes - 24))).toMap
   }
+
+  server.stop()
+  client.shutdown()
+
+  System.exit(0)
 }
 
 object BenchmarkResults {
