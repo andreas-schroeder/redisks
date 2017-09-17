@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 
 class RedisKeyValueIteratorSpec extends fixture.FlatSpec with MustMatchers with ScalaFutures {
 
-  val timeout = 100.millis
+  val timeout: FiniteDuration = 100.millis
 
   behavior of "RedisKeyValueIterator.hasNext"
 
@@ -93,7 +93,6 @@ class RedisKeyValueIteratorSpec extends fixture.FlatSpec with MustMatchers with 
     caught.getCause mustBe a[NoSuchElementException]
   }
 
-
   behavior of "RedisKeyValueIterator.peekNextKey"
 
   it should "peek the next key if it is available" in { fixture =>
@@ -137,7 +136,7 @@ class RedisKeyValueIteratorSpec extends fixture.FlatSpec with MustMatchers with 
   }
 
   class FixtureParam() {
-    val kvIt = new RedisKeyValueIterator[String,String](2, "store-name")
+    val kvIt = new RedisKeyValueIterator[String, String](2, "store-name", _ => ())
 
     def putItem(key: String, value: String): Unit = kvIt.queue.put(OnNext(new KeyValue(key, value)))
 
