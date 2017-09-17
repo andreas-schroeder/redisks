@@ -1,3 +1,13 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'cz.alenkacz:gradle-scalafmt:1.5.0'
+    }
+}
+
+
 plugins {
     id 'com.github.maiflai.scalatest' version '0.16'
     id 'com.jfrog.bintray' version '1.7.3'
@@ -5,6 +15,7 @@ plugins {
 
 allprojects {
     apply plugin: 'scala'
+    apply plugin: 'scalafmt'
     apply plugin: 'idea'
     apply plugin: 'com.github.maiflai.scalatest'
     apply plugin: 'maven-publish'
@@ -60,6 +71,12 @@ allprojects {
             events "passed", "skipped", "failed"
         }
     }
+
+    scalafmt {
+        configFilePath = "${rootDir}/.scalafmt.conf"
+    }
+
+    tasks.check.dependsOn(checkScalafmtAll)
 }
 
 publishing {
