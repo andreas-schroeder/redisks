@@ -7,7 +7,7 @@ import scala.util.Random
 
 object RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
 
-  val port = freePort
+  val port   = freePort
   val server = RedisServer.builder().setting("""save """"").port(port).build()
   server.start()
 
@@ -15,7 +15,7 @@ object RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
 
   val client = RedisClient.create(RedisURI.create("localhost", port))
 
-  val admin = new RedisStoreAdmin(RedisConnectionProvider.fromClient(client))
+  val admin   = new RedisStoreAdmin(RedisConnectionProvider.fromClient(client))
   var counter = 0
 
   def nextStoreName(): String = {
@@ -28,9 +28,11 @@ object RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
     val all = for (pass <- 0 to 3) yield {
       System.gc()
       val storeName = nextStoreName()
-      val store = createStore(storeName, client, context)
-      val putStart = System.currentTimeMillis()
-      keyValues.foreach{ kv => store.put(kv._1, kv._2) }
+      val store     = createStore(storeName, client, context)
+      val putStart  = System.currentTimeMillis()
+      keyValues.foreach { kv =>
+        store.put(kv._1, kv._2)
+      }
       store.flush()
       val last = keyValues.last
       while (store.approximateNumEntries != entriesCount && store.get(last._1) != last._2) {
@@ -41,7 +43,8 @@ object RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
       val getStart = System.currentTimeMillis()
       keyValues.foreach(kv => store.get(kv._1))
       val getDuration = System.currentTimeMillis() - getStart
-      val r = BenchmarkResults(getDuration, putDuration, entriesCount, entryBytes)
+      val r =
+        BenchmarkResults(getDuration, putDuration, entriesCount, entryBytes)
       store.close()
       admin.clearStore(storeName, 1)
       println(r.reportLine)
@@ -65,7 +68,7 @@ object RedisKeyValueStoreBenchmark extends App with RedisKeyValueStores {
     val rnd = new Random()
 
     var keys = Set[String]()
-    while(keys.size < size) {
+    while (keys.size < size) {
       keys += rnd.nextString(24)
     }
     keys.map(k => (k, rnd.nextString(entryBytes - 24))).toMap
@@ -97,6 +100,6 @@ case class BenchmarkResults(getDurationMs: Long, putDurationMs: Long, entriesCou
   val reportLine: String =
     f"entry size: $entryBytes%4d\tput: $putThroughput%4.2f MiB/Sec $putDurationMs%5d ms\tget: $getThroughput%4.2f MiB/Sec $getDurationMs%5d ms"
 
-  private def toMbPerSec(durationMs: Long): Double = 1000.0 * totalBytes / (durationMs * 1024 * 1024)
+  private def toMbPerSec(durationMs: Long): Double =
+    1000.0 * totalBytes / (durationMs * 1024 * 1024)
 }
-

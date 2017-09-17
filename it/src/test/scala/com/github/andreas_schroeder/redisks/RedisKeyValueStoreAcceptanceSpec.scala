@@ -1,31 +1,38 @@
 package com.github.andreas_schroeder.redisks
 
 import java.lang.{NullPointerException => NPE}
+import java.util.UUID
+import java.util.concurrent.TimeoutException
 
 import com.lambdaworks.redis.{RedisClient, RedisURI}
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.processor.ProcessorContext
 import org.mockito.Mockito.when
+
+import scala.concurrent.duration._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{GivenWhenThen, MustMatchers, Outcome, fixture}
+import org.scalatest._
 import redis.embedded.RedisServer
 
 import scala.collection.JavaConverters._
+import scala.concurrent.{Await, Future, Promise}
+import scala.util.Success
 
-class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
-  with RedisKeyValueStores
-  with GivenWhenThen
-  with MockitoSugar
-  with MustMatchers
-  with Eventually {
+class RedisKeyValueStoreAcceptanceSpec
+    extends fixture.FeatureSpec
+    with BeforeAndAfterAll
+    with RedisKeyValueStores
+    with GivenWhenThen
+    with MockitoSugar
+    with MustMatchers
+    with Eventually {
 
-  implicit override val patienceConfig = PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(50, Millis)))
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(50, Millis)))
 
-  case class FixtureParam(redisServer: RedisServer,
-                          client: RedisClient,
-                          context: ProcessorContext,
+  case class FixtureParam(context: ProcessorContext,
                           store: RedisKeyValueStore[String, String],
                           secondStore: RedisKeyValueStore[String, String])
 
@@ -289,35 +296,81 @@ class RedisKeyValueStoreAcceptanceSpec extends fixture.FeatureSpec
       Seq("a", "b", "c", "e").foreach(i => store.put(i, i))
 
       Then("range returns the entries in the requested range")
-      val result = store.range("b", "d").asScala.to[Seq]
-      val expected = Seq("b", "c").map(i => new KeyValue(i , i))
+      val result   = store.range("b", "d").asScala.to[Seq]
+      val expected = Seq("b", "c").map(i => new KeyValue(i, i))
       result must have size 2
       result must contain allElementsOf expected
     }
   }
 
-  private def createKeyValues(count: Int) = (1 to count).map(i => new KeyValue(s"k$i", s"v$i"))
+  feature("close") {
+    scenario("closes all open iterators") { fixture =>
+      import fixture._
+
+      Given("a store with open iterators")
+      val it = store.all().asInstanceOf[RedisKeyValueIterator[String, String]]
+      it.closed mustBe false
+
+      When("closing the store")
+      store.close()
+
+      Then("the open iterators are closed")
+      it.closed mustBe true
+    }
+
+    scenario("waits for pending operations") { fixture =>
+      import fixture._
+      import scala.concurrent.ExecutionContext.Implicits._
+      val p = Promise[Any]()
+
+      Given("a store with pending operations")
+      store.addPendingOperations(p.future)
+
+      When("closing the store")
+      val eventuallyClosed = Future { store.close() }
+
+      Then("the store waits for completion of the operations")
+      a[TimeoutException] mustBe thrownBy {
+        Await.ready(eventuallyClosed, 500.millis)
+      }
+      p.complete(Success(()))
+      Await.ready(eventuallyClosed, 500.millis)
+    }
+  }
+
+  private def createKeyValues(count: Int) =
+    (1 to count).map(i => new KeyValue(s"k$i", s"v$i"))
+
+  val redisPort = freePort
+
+  val server = new RedisServer(redisPort)
+
+  @volatile var client: RedisClient = _
+
+  override protected def beforeAll(): Unit = {
+    server.start()
+    client = RedisClient.create(RedisURI.create("localhost", redisPort))
+    super.beforeAll()
+  }
+
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    client.shutdown()
+    server.stop()
+  }
+
+  def randomName: String = UUID.randomUUID.toString
 
   def withFixture(test: OneArgTest): Outcome = {
-    val port = freePort
-    val server = new RedisServer(port)
     val context = createContext
-    val client = RedisClient.create(RedisURI.create("localhost", port))
-    server.start()
-    val fixture = FixtureParam(
-      server,
-      client,
-      context,
-      createStore("a", client, context),
-      createStore("b", client, context))
+    val fixture =
+      FixtureParam(context, createStore(randomName, client, context), createStore(randomName, client, context))
 
     try {
       withFixture(test.toNoArgTest(fixture))
     } finally {
       fixture.store.close()
       fixture.secondStore.close()
-      client.shutdown()
-      server.stop()
     }
   }
 

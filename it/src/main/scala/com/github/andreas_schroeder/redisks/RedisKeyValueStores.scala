@@ -13,7 +13,7 @@ trait RedisKeyValueStores extends MockitoSugar {
 
   def freePort = {
     val socket = new ServerSocket(0)
-    val port = socket.getLocalPort
+    val port   = socket.getLocalPort
     socket.close()
     port
   }
@@ -35,7 +35,8 @@ trait RedisKeyValueStores extends MockitoSugar {
       (prefix + "k").getBytes(),
       Serdes.String(),
       Serdes.String(),
-      Comparator.naturalOrder())
+      Comparator.naturalOrder()
+    )
     store.init(context, null)
     store
   }
