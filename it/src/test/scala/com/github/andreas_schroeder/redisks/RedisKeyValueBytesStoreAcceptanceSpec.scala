@@ -1,43 +1,44 @@
 package com.github.andreas_schroeder.redisks
 
-import java.lang.{NullPointerException => NPE}
-import java.util.UUID
-import java.util.concurrent.TimeoutException
-
 import com.lambdaworks.redis.{RedisClient, RedisURI}
 import org.apache.kafka.streams.KeyValue
 import org.apache.kafka.streams.processor.ProcessorContext
+import org.apache.kafka.streams.state.KeyValueStore
 import org.mockito.Mockito.when
-
-import scala.concurrent.duration._
-import org.scalatest.concurrent.Eventually
-import org.scalatest.mockito.MockitoSugar
-import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest._
+import org.scalatest.concurrent.Eventually
+import org.scalatest.featurespec.FixtureAnyFeatureSpec
+import org.scalatest.matchers._
+import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatestplus.mockito.MockitoSugar
 import redis.embedded.RedisServer
 
+import java.lang.{NullPointerException => NPE}
+import java.util.UUID
+import java.util.concurrent.TimeoutException
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.Success
 
-class RedisKeyValueStoreAcceptanceSpec
-    extends fixture.FeatureSpec
+class RedisKeyValueBytesStoreAcceptanceSpec
+    extends FixtureAnyFeatureSpec
     with BeforeAndAfterAll
     with RedisKeyValueStores
     with GivenWhenThen
     with MockitoSugar
-    with MustMatchers
+    with must.Matchers
     with Eventually {
 
-  implicit override val patienceConfig =
+  implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(50, Millis)))
 
   case class FixtureParam(context: ProcessorContext,
-                          store: RedisKeyValueStore[String, String],
-                          secondStore: RedisKeyValueStore[String, String])
+                          store: KeyValueStore[String,String],
+                          secondStore: KeyValueStore[String,String])
 
-  feature("put and get") {
-    scenario("Value is not set") { f =>
+  Feature("put and get") {
+    Scenario("Value is not set") { f =>
       Given("an empty key-value store")
 
       When("any entry is retrieved")
@@ -47,7 +48,7 @@ class RedisKeyValueStoreAcceptanceSpec
       value mustBe null
     }
 
-    scenario("One key stored") { fixture =>
+    Scenario("One key stored") { fixture =>
       import fixture._
 
       Given("A store with an entry for key 'k'")
@@ -61,7 +62,7 @@ class RedisKeyValueStoreAcceptanceSpec
       v mustBe "value"
     }
 
-    scenario("Two keys stored") { fixture =>
+    Scenario("Two keys stored") { fixture =>
       import fixture._
 
       When("adding two entries with different values")
@@ -75,8 +76,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("Sharing redis") {
-    scenario("Store for two partitions") { implicit fixture =>
+  Feature("Sharing redis") {
+    Scenario("Store for two partitions") { implicit fixture =>
       import fixture._
       When("adding entries for different partitions")
       setContextPartition(0)
@@ -97,7 +98,7 @@ class RedisKeyValueStoreAcceptanceSpec
       store.get("key2") mustBe "value2"
     }
 
-    scenario("Two different stores") { implicit fixture =>
+    Scenario("Two different stores") { implicit fixture =>
       import fixture._
 
       When("adding entries to different stores")
@@ -115,8 +116,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("putIfAbsent") {
-    scenario("A value is already associated") { fixture =>
+  Feature("putIfAbsent") {
+    Scenario("A value is already associated") { fixture =>
       import fixture._
 
       Given("A store with an entry for key 'k'")
@@ -133,7 +134,7 @@ class RedisKeyValueStoreAcceptanceSpec
       store.get("k") mustBe "value 1"
     }
 
-    scenario("No value is associated yet") { fixture =>
+    Scenario("No value is associated yet") { fixture =>
       import fixture._
       Given("A store with no for key 'k'")
       When("calling putIfAbsent with that key")
@@ -146,7 +147,7 @@ class RedisKeyValueStoreAcceptanceSpec
       store.get("k") mustBe "value 2"
     }
 
-    scenario("null key is passed") { fixture =>
+    Scenario("null key is passed") { fixture =>
       import fixture._
 
       When("calling putIfAbsent with a null key")
@@ -154,7 +155,7 @@ class RedisKeyValueStoreAcceptanceSpec
       a[NPE] must be thrownBy store.putIfAbsent(null, "value")
     }
 
-    scenario("null value is passed") { fixture =>
+    Scenario("null value is passed") { fixture =>
       import fixture._
 
       When("calling putIfAbsent with a null value")
@@ -163,8 +164,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("delete") {
-    scenario("delete existing entry") { fixture =>
+  Feature("delete") {
+    Scenario("delete existing entry") { fixture =>
       import fixture._
 
       Given("A store with an entry for key 'k'")
@@ -181,7 +182,7 @@ class RedisKeyValueStoreAcceptanceSpec
       store.get("key") mustBe null
     }
 
-    scenario("delete non-existing entry") { fixture =>
+    Scenario("delete non-existing entry") { fixture =>
       import fixture._
 
       When("deleting a non-existing entry")
@@ -191,7 +192,7 @@ class RedisKeyValueStoreAcceptanceSpec
       value mustBe null
     }
 
-    scenario("Delete key from one of multiple partitions") { implicit fixture =>
+    Scenario("Delete key from one of multiple partitions") { implicit fixture =>
       import fixture._
 
       Given("a store with an entry for key 'k' in two partitions")
@@ -213,8 +214,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("putAll") {
-    scenario("Stores all entries") { fixture =>
+  Feature("putAll") {
+    Scenario("Stores all entries") { fixture =>
       import fixture._
 
       When("adding multiple entries")
@@ -229,8 +230,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("all") {
-    scenario("iterates all entries") { fixture =>
+  Feature("all") {
+    Scenario("iterates all entries") { fixture =>
       import fixture._
 
       When("adding multiple entries")
@@ -245,7 +246,7 @@ class RedisKeyValueStoreAcceptanceSpec
       resultKvs must contain allElementsOf kvs
     }
 
-    scenario("iterates no entries") { fixture =>
+    Scenario("iterates no entries") { fixture =>
       import fixture._
       Given("an empty store")
       Then("iterating all entries yields no entries, but completes")
@@ -255,7 +256,7 @@ class RedisKeyValueStoreAcceptanceSpec
       all.close()
     }
 
-    scenario("aborting iteration") { fixture =>
+    Scenario("aborting iteration") { fixture =>
       import fixture._
 
       Given("a store with entries")
@@ -276,8 +277,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("approximateNumEntries") {
-    scenario("Store with entries") { fixture =>
+  Feature("approximateNumEntries") {
+    Scenario("Store with entries") { fixture =>
       import fixture._
 
       Given("a store with entries")
@@ -288,8 +289,8 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("range") {
-    scenario("produces elements in range") { fixture =>
+  Feature("range") {
+    Scenario("produces elements in range") { fixture =>
       import fixture._
 
       Given("a store with entries")
@@ -303,28 +304,34 @@ class RedisKeyValueStoreAcceptanceSpec
     }
   }
 
-  feature("close") {
-    scenario("closes all open iterators") { fixture =>
+  Feature("close") {
+    Scenario("closes all open iterators") { fixture =>
       import fixture._
 
       Given("a store with open iterators")
-      val it = store.all().asInstanceOf[RedisKeyValueIterator[String, String]]
-      it.closed mustBe false
+      val it = store.all()
+      // does not throw
+      it.hasNext 
 
       When("closing the store")
       store.close()
 
       Then("the open iterators are closed")
-      it.closed mustBe true
+      assertThrows[IllegalStateException] {
+        it.hasNext  
+      }
     }
 
-    scenario("waits for pending operations") { fixture =>
+    Scenario("waits for pending operations") { fixture =>
       import fixture._
+
       import scala.concurrent.ExecutionContext.Implicits._
       val p = Promise[Any]()
 
       Given("a store with pending operations")
-      store.addPendingOperations(p.future)
+      val f = store.getClass.getSuperclass.getDeclaredField("wrapped")
+      f.setAccessible(true)
+      f.get(store).asInstanceOf[RedisKeyValueBytesStore].addPendingOperations(p.future)
 
       When("closing the store")
       val eventuallyClosed = Future { store.close() }
@@ -341,7 +348,7 @@ class RedisKeyValueStoreAcceptanceSpec
   private def createKeyValues(count: Int) =
     (1 to count).map(i => new KeyValue(s"k$i", s"v$i"))
 
-  val redisPort = freePort
+  val redisPort: Int = freePort
 
   val server = new RedisServer(redisPort)
 

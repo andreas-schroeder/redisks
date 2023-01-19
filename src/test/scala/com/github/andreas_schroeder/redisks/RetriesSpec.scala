@@ -1,25 +1,26 @@
 package com.github.andreas_schroeder.redisks
 
-import java.util.concurrent.{Executors, ScheduledExecutorService}
-
 import com.lambdaworks.redis.RedisConnectionException
-import org.scalatest.mockito.MockitoSugar
 import org.mockito.Mockito.verify
-import org.scalatest.{MustMatchers, Outcome, fixture}
+import org.scalatest.matchers._
+import org.scalatest.{Outcome, flatspec}
+import org.scalatestplus.mockito.MockitoSugar
 import rx.lang.scala.Observable
 import rx.lang.scala.observers.TestSubscriber
 import rx.lang.scala.schedulers.TestScheduler
 import rx.lang.scala.subjects.PublishSubject
 
+import java.util.concurrent.{Executors, ScheduledExecutorService}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class RetriesSpec extends fixture.FlatSpec with MustMatchers with MockitoSugar {
+class RetriesSpec extends flatspec.FixtureAnyFlatSpec with must.Matchers with MockitoSugar {
 
   behavior of "backoffOrCancelWhen"
 
   it should "retry with backoff" in { fixture =>
     import fixture._
+    
     val obs = Observable.just(ex, ex)
 
     retries.backoffOrCancelWhen(cancel = false, obs).subscribe(sub)
@@ -126,9 +127,9 @@ class RetriesSpec extends fixture.FlatSpec with MustMatchers with MockitoSugar {
     val ex: Throwable                         = new RedisConnectionException("test exception")
     val threadPool: ScheduledExecutorService  = Executors.newScheduledThreadPool(2)
     val ec: ExecutionContext                  = ExecutionContext.fromExecutor(threadPool)
-    val scheduler                             = TestScheduler()
+    val scheduler: TestScheduler              = TestScheduler()
     val retryLogger: (Throwable, Int) => Unit = mock[(Throwable, Int) => Unit]
-    val failureLogger: (Throwable) => Unit    = mock[Throwable => Unit]
+    val failureLogger: Throwable => Unit      = mock[Throwable => Unit]
     val retries: Retries                      = new Retries(1.second, 20.seconds, 3, scheduler, threadPool, ec, retryLogger, failureLogger)
   }
 }

@@ -92,10 +92,10 @@ object BenchmarkResults {
 }
 
 case class BenchmarkResults(getDurationMs: Long, putDurationMs: Long, entriesCount: Int, entryBytes: Int) {
-  val totalBytes = entriesCount * entryBytes
+  private val totalBytes: Int = entriesCount * entryBytes
 
-  val putThroughput = toMbPerSec(putDurationMs)
-  val getThroughput = toMbPerSec(getDurationMs)
+  private val putThroughput: Double = toMbPerSec(putDurationMs)
+  private val getThroughput: Double = toMbPerSec(getDurationMs)
 
   val reportLine: String =
     f"entry size: $entryBytes%4d\tput: $putThroughput%4.2f MiB/Sec $putDurationMs%5d ms\tget: $getThroughput%4.2f MiB/Sec $getDurationMs%5d ms"

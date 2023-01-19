@@ -1,6 +1,5 @@
 package com.github.andreas_schroeder.redisks
 
-import java.util.NoSuchElementException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
 

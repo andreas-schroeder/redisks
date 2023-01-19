@@ -1,6 +1,6 @@
 buildscript {
     repositories {
-        jcenter()
+        mavenLocal()
     }
     dependencies {
         classpath 'cz.alenkacz:gradle-scalafmt:1.5.0'
@@ -9,8 +9,8 @@ buildscript {
 
 
 plugins {
-    id 'com.github.maiflai.scalatest' version '0.16'
-    id 'com.jfrog.bintray' version '1.7.3'
+    id 'com.github.maiflai.scalatest' version '0.32'
+    id "org.scoverage" version '7.0.1'
 }
 
 allprojects {
@@ -27,6 +27,7 @@ allprojects {
     sourceSets {
         main {
             scala {
+                // build order is important
                 srcDirs = ['src/main/scala', 'src/main/java']
             }
             java {
@@ -44,27 +45,25 @@ allprojects {
 
     dependencies {
 
-        compile       group: 'org.scala-lang',             name: 'scala-library', version: '2.12.3'
-        compile       group: 'org.apache.kafka',           name: 'kafka-streams', version: '0.11.0.0'
-        compile       group: 'biz.paluch.redis',           name: 'lettuce',       version: '4.4.0.Final'
-        compile scala(group: 'io.reactivex',               name: 'rxscala',       version: '0.26.5')
-        compile scala(group: 'com.typesafe.scala-logging', name: 'scala-logging', version: '3.7.2')
+        implementation       group: 'org.scala-lang',             name: 'scala-library', version: '2.12.15'
+        implementation       group: 'org.apache.kafka',           name: 'kafka-streams', version: kafkaVersion
+        implementation       group: 'biz.paluch.redis',           name: 'lettuce',       version: '4.4.0.Final'
+        implementation       group: 'org.jetbrains',              name: 'annotations',   version: '23.0.0'
 
-        testCompile       group: 'com.github.kstyrc',    name: 'embedded-redis',           version: '0.6'
-        testCompile       group: 'org.mockito',          name: 'mockito-core',             version: '2.8.47'
-        testCompile       group: 'org.apache.kafka',     name: 'kafka-streams',            version: '0.11.0.0'
-        testCompile       group: 'org.apache.zookeeper', name: 'zookeeper',                version: '3.4.10', ext: 'pom'
-        testCompile       group: 'org.slf4j',            name: 'slf4j-log4j12',            version: '1.7.25'
-        testCompile       group: 'log4j',                name: 'log4j',                    version: '1.2.17'
-        testCompile scala(group: 'net.manub',            name: 'scalatest-embedded-kafka', version: '0.15.1')
-        testCompile scala(group: 'org.scalatest',        name: 'scalatest',                version: '3.0.1')
+        implementation scala(group: 'io.reactivex',               name: 'rxscala',       version: '0.27.0')
+        implementation scala(group: 'com.typesafe.scala-logging', name: 'scala-logging', version: '3.9.5')
 
-        testRuntime group: 'org.pegdown',    name: 'pegdown',         version: '1.4.2'
+        testImplementation       group: 'com.github.kstyrc',       name: 'embedded-redis',           version: '0.6'
+        testImplementation scala(group: 'org.scalatestplus',       name: 'mockito-4-5',              version: "${scalaTestVersion}.0")
+        testImplementation       group: 'org.apache.kafka',        name: 'kafka-streams',            version: kafkaVersion
+        testImplementation       group: 'org.slf4j',               name: 'slf4j-log4j12',            version: '1.7.25'
+        testImplementation       group: 'log4j',                   name: 'log4j',                    version: '1.2.17'
+        testImplementation       group: 'org.apache.zookeeper',    name: 'zookeeper',                version: '3.6.3'
+        testImplementation scala(group: 'io.github.embeddedkafka', name: 'embedded-kafka',           version: kafkaVersion)
+        testImplementation scala(group: 'org.scalatest',           name: 'scalatest',                version: scalaTestVersion)
+        testRuntimeOnly          group: 'com.vladsch.flexmark',    name: 'flexmark-all',             version: '0.64.0'
     }
-
-    task wrapper(type: Wrapper) {
-        gradleVersion = '4.1'
-    }
+    
 
     test {
         testLogging {
@@ -90,26 +89,14 @@ publishing {
     }
 }
 
-bintray {
-    user = System.getenv('BINTRAY_USER')
-    key = System.getenv('BINTRAY_KEY')
-    pkg {
-        repo = 'maven'
-        name = 'redisks'
-        userOrg = 'and-schroeder'
-    }
-    publications = ['RedisksPublication']
-}
-
 project(':it') {
     dependencies {
-        compile rootProject
-        compile scala(group: 'org.scalatest',     name: 'scalatest',      version: '3.0.1')
-        compile       group: 'org.mockito',       name: 'mockito-core',   version: '2.8.47'
-        compile       group: 'com.github.kstyrc', name: 'embedded-redis', version: '0.6'
-        compile       group: 'org.slf4j',         name: 'slf4j-log4j12',  version: '1.7.25'
-        compile       group: 'log4j',             name: 'log4j',          version: '1.2.17'
-        compile group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.13.Final', classifier: 'osx-x86_64'
+        implementation rootProject
+        implementation scala(group: 'org.scalatestplus', name: 'mockito-4-5',                   version: "${scalaTestVersion}.0")
+        implementation       group: 'com.github.kstyrc', name: 'embedded-redis',                version: '0.6'
+        implementation       group: 'org.slf4j',         name: 'slf4j-log4j12',                 version: '1.7.25'
+        implementation       group: 'log4j',             name: 'log4j',                         version: '1.2.17'
+        implementation       group: 'io.netty',          name: 'netty-transport-native-kqueue', version: '4.1.13.Final'
     }
 }
 
