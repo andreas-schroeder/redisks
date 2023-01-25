@@ -1,6 +1,5 @@
 package com.github.andreas_schroeder.redisks
 
-import com.github.andreas_schroeder.redisks.RedisKeyValueStores._
 import com.lambdaworks.redis.RedisClient
 import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.common.config.ConfigDef
@@ -32,6 +31,8 @@ object RedisKeyValueStores {
 
 trait RedisKeyValueStores extends MockitoSugar {
 
+  import RedisKeyValueStores._
+
   def freePort: Int = {
     val socket = new ServerSocket(0)
     val port = socket.getLocalPort
@@ -39,7 +40,7 @@ trait RedisKeyValueStores extends MockitoSugar {
     port
   }
 
-  def clientId = "clientId"
+  private def clientId = "clientId"
 
   private def getMetrics(config: StreamsConfig, time: Time, clientId: String): Metrics = {
     val metricConfig: MetricConfig = new MetricConfig().samples(config.getInt(StreamsConfig.METRICS_NUM_SAMPLES_CONFIG)).recordLevel(Sensor.RecordingLevel.forName(config.getString(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG))).timeWindow(config.getLong(StreamsConfig.METRICS_SAMPLE_WINDOW_MS_CONFIG), TimeUnit.MILLISECONDS)
