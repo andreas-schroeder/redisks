@@ -53,15 +53,16 @@ allprojects {
         implementation scala(group: 'io.reactivex',               name: 'rxscala',       version: '0.27.0')
         implementation scala(group: 'com.typesafe.scala-logging', name: 'scala-logging', version: '3.9.5')
 
-        testImplementation       group: 'com.github.kstyrc',       name: 'embedded-redis',           version: '0.6'
-        testImplementation scala(group: 'org.scalatestplus',       name: 'mockito-4-5',              version: "${scalaTestVersion}.0")
-        testImplementation       group: 'org.apache.kafka',        name: 'kafka-streams',            version: kafkaVersion
-        testImplementation       group: 'org.slf4j',               name: 'slf4j-log4j12',            version: '1.7.25'
-        testImplementation       group: 'log4j',                   name: 'log4j',                    version: '1.2.17'
-        testImplementation       group: 'org.apache.zookeeper',    name: 'zookeeper',                version: '3.6.3'
-        testImplementation scala(group: 'io.github.embeddedkafka', name: 'embedded-kafka',           version: kafkaVersion)
-        testImplementation scala(group: 'org.scalatest',           name: 'scalatest',                version: scalaTestVersion)
-        testImplementation       group: 'io.netty',          name: 'netty-transport-native-kqueue', version: '4.1.13.Final'
+        testImplementation       group: 'com.github.kstyrc',       name: 'embedded-redis',                version: '0.6'
+        testImplementation scala(group: 'org.scalatestplus',       name: 'mockito-4-5',                   version: "${scalaTestVersion}.0")
+        testImplementation       group: 'org.apache.kafka',        name: 'kafka-streams',                 version: kafkaVersion
+        testImplementation       group: 'org.slf4j',               name: 'slf4j-api',                     version: '1.7.30'
+        testImplementation       group: 'ch.qos.logback',          name: 'logback-classic',               version: '1.2.10'
+        testImplementation       group: 'ch.qos.logback',          name: 'logback-core',                  version: '1.2.10'
+        testImplementation       group: 'org.apache.zookeeper',    name: 'zookeeper',                     version: '3.6.3'
+        testImplementation scala(group: 'io.github.embeddedkafka', name: 'embedded-kafka',                version: kafkaVersion)
+        testImplementation scala(group: 'org.scalatest',           name: 'scalatest',                     version: scalaTestVersion)
+        testImplementation       group: 'io.netty',                name: 'netty-transport-native-kqueue', version: '4.1.13.Final'
         
         testRuntimeOnly          group: 'com.vladsch.flexmark',    name: 'flexmark-all',             version: '0.64.0'
     }

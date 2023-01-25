@@ -8,7 +8,7 @@ import org.apache.kafka.streams.KafkaStreams.State._
 import org.apache.kafka.streams.KafkaStreams.{State, StateListener}
 import org.apache.kafka.streams._
 import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler
-import org.apache.kafka.streams.kstream.{KTable, Materialized}
+import org.apache.kafka.streams.kstream.{KTable, Materialized, ValueJoiner}
 import org.apache.kafka.streams.state.{QueryableStoreType, QueryableStoreTypes, ReadOnlyKeyValueStore}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
@@ -56,7 +56,9 @@ class KafkaStreamsAcceptanceSpec
                 .withCachingEnabled()
                 .withLoggingDisabled())
             topicOne
-              .join[String, String](topicTwo, (value1: String, value2: String) => value1 + "x" + value2)
+              .join[String, String](topicTwo,  new ValueJoiner[String,String,String] () {
+                override def apply(value1: String, value2: String): String = value1 + "x" + value2
+              })
               .toStream().to("topic-out")
           } { _ =>
             Given("a streams app joining two topics")
