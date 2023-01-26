@@ -1,0 +1,15 @@
+<configuration>
+    <appender name="stderr" class="ch.qos.logback.core.ConsoleAppender">
+        <Target>System.err</Target>
+        <encoder>
+            <pattern>[%d] %p %m (%c)%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="org.apache.zookeeper" level="OFF"/>
+    <logger name="com.lambdaworks.redis" level="OFF"/>
+    <logger name="org.apache.kafka" level="OFF"/>
+    <logger name="kafka" level="OFF"/>
+    <root level="WARN">
+        <appender-ref ref="stderr"/>
+    </root>
+</configuration>

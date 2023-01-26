@@ -3,21 +3,23 @@ package com.github.andreas_schroeder.redisks
 import org.apache.kafka.streams.KeyValue
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.{MustMatchers, Outcome, fixture}
+import org.scalatest.matchers._
+import org.scalatest.{Outcome, flatspec}
 import rx.lang.scala.Notification.{OnCompleted, OnNext}
 
-import scala.concurrent.ExecutionContext.Implicits._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class RedisKeyValueIteratorSpec extends fixture.FlatSpec with MustMatchers with ScalaFutures {
+class RedisKeyValueIteratorSpec extends flatspec.FixtureAnyFlatSpec  with must.Matchers with ScalaFutures {
 
   val timeout: FiniteDuration = 100.millis
 
   behavior of "RedisKeyValueIterator.hasNext"
 
-  it should "return true when next item is available" in { fixture =>
-    import fixture._
+  it should "return true when next item is available" in { kvFixture =>
+    
+    import kvFixture._
 
     putItem("key", "value")
 

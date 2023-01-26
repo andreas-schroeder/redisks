@@ -2,12 +2,14 @@ package com.github.andreas_schroeder.redisks
 
 import com.lambdaworks.redis.{RedisClient, RedisURI}
 import org.apache.kafka.streams.processor.ProcessorContext
-import org.scalatest.{GivenWhenThen, MustMatchers, Outcome, fixture}
+import org.scalatest.featurespec._
+import org.scalatest.matchers._
+import org.scalatest.{GivenWhenThen, Outcome}
 import redis.embedded.RedisServer
 
 class RedisStoreAdminAcceptanceSpec
-    extends fixture.FeatureSpec
-    with MustMatchers
+    extends FixtureAnyFeatureSpec
+    with must.Matchers
     with GivenWhenThen
     with RedisKeyValueStores {
 
@@ -16,8 +18,8 @@ class RedisStoreAdminAcceptanceSpec
                           context: ProcessorContext,
                           admin: RedisStoreAdmin)
 
-  feature("clearStore") {
-    scenario("clear an existing store") { fixture =>
+  Feature("clearStore") {
+    Scenario("clear an existing store") { fixture =>
       import fixture._
       Given("an existing store")
       println("creating the store")
