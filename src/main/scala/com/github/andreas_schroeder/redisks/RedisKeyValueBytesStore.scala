@@ -150,7 +150,7 @@ class RedisKeyValueBytesStore(
         key.get()))
       .retryWhen(backoff)
       .toBlocking
-      .headOrElse(null)
+      .headOrElse(null.asInstanceOf[ValueBytes])
   }
 
   override def putAll(entries: util.List[KeyValue[KeyBytes, ValueBytes]]): Unit = this.synchronized {

@@ -16,6 +16,21 @@ app can start processing records.
 
 Compile and install in your local maven repository, then reference the package in your favourite build tool.
 
+
+### Maven
+
+```xml
+
+<dependencies>
+    <dependency>
+        <groupId>com.github.andreas-schroeder</groupId>
+        <artifactId>redisks_2.12</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </dependency>
+</dependencies>
+
+```
+
 ### Gradle
 
 ```groovy
